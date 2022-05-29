@@ -1,32 +1,33 @@
-# _Sample project_
+# ESP32 Remote Camera
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+Work in progress
 
-This is the simplest buildable example. The example is used by command `idf.py create-project`
-that copies the project to user specified path and set it's name. For more information follow the [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project)
+## Configuring
 
+Follow the 
+[ESP-IDF installation guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/linux-macos-setup.html)
+before starting. 
+You'll need to have the following in your `~/.bashrc` file in order to use ESP-IDF tools from
+any shell: 
+```bash
+addPath() {
+    export PATH="$*:$PATH"
+}
 
+addPath "/home/bassam/data/ESP32-IDF/xtensa-esp32-elf"
+export IDF_PATH="/home/bassam/data/ESP-IDF/esp-idf"
+export IDF_PYTHON_ENV_PATH="/usr/bin/python3.8"
 
-## How to use example
-We encourage the users to use the example as a template for the new projects.
-A recommended way is to follow the instructions on a [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project).
-
-## Example folder contents
-
-The project **sample_project** contains one source file in C language [main.c](main/main.c). The file is located in folder [main](main).
-
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt`
-files that provide set of directives and instructions describing the project's source files and targets
-(executable, library, or both). 
-
-Below is short explanation of remaining files in the project folder.
-
+alias esp-export=". $IDF_PATH/export.sh"
 ```
-├── CMakeLists.txt
-├── main
-│   ├── CMakeLists.txt
-│   └── main.c
-└── README.md                  This is the file you are currently reading
-```
-Additionally, the sample project contains Makefile and component.mk files, used for the legacy Make based build system. 
-They are not used or needed when building with CMake and idf.py.
+Change the above appropriately, you will need to call `esp-export` once before any ESP-IDF operations
+such as `idf.py build`
+
+### CLion
+
+Add the environment script [`./setup-env.sh`](./setup-env.sh) to the current toolchain
+so that CLion loads the path variables correctly, this solves the issue with unknown C, CXX and ASM compilers
+as well as any "missing dependencies" problems that CMake would otherwise exclaim, 
+see [JetBrains' guide](https://www.jetbrains.com/help/clion/how-to-create-toolchain-in-clion.html#env-scripts)
+for how to do this and read more about ESP-IDF setup on CLion 
+[here](https://www.jetbrains.com/help/clion/esp-idf.html).
