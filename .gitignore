@@ -3,4 +3,6 @@ cmake-build*/
 build/
 
 sdkconfig
-CMakeCache.txt
+
+# header file with passwords and API keys
+main/secrets.h
