@@ -23,48 +23,55 @@ static EventGroupHandle_t wifiEventGroup;
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT      BIT1
 
-#define WIFI_TAG "WiFi"
-
+#define WIFI_TAG "Wifi Service"
 #define WIFI_CONNECT_RETRY_ATTEMPTS 10
-private uint8_t retryCount = 0;
+#define LOGI(format, ...) ESP_LOGI(WIFI_TAG, format, ##__VA_ARGS__)
+#define LOGE(format, ...) ESP_LOGE(WIFI_TAG, format, ##__VA_ARGS__)
 
-private esp_err_t err;
+private WifiMode currentWifiMode = WIFI_MODE_NULL;
+private enum {
+    STOPPED, STARTED
+} currentState;
 
-private void wifi_eventHandler(void *arg, esp_event_base_t event_base,
-                               int32_t event_id, void *event_data) {
+private void wifi_eventHandlerSTAConnect(void *arg, esp_event_base_t event_base,
+                                         int32_t event_id, void *event_data) {
+    esp_err_t err = ESP_OK;
+    uint8_t retryCount = 0;
     if (event_base == WIFI_EVENT) {
         switch (event_id) {
             case WIFI_EVENT_STA_START:
-                ESP_LOGI(WIFI_TAG, "Connecting to Access Point");
-                err = esp_wifi_connect();
-                if (err) ESP_LOGE(WIFI_TAG, "Connect returned error: %i : %s", err, esp_err_to_name(err));
+                LOGI("Connecting to Access Point");
+                if ((err = esp_wifi_connect())) {
+                    LOGE("Connect returned error: %i : %s", err, esp_err_to_name(err));
+                }
                 break;
             case WIFI_EVENT_STA_DISCONNECTED:
                 if (retryCount < WIFI_CONNECT_RETRY_ATTEMPTS) {
-                    esp_wifi_connect();
-                    if (err) ESP_LOGE(WIFI_TAG, "Connect returned error: %i : %s", err, esp_err_to_name(err));
+                    if ((err = esp_wifi_connect())) {
+                        LOGE("Connect returned error: %i : %s", err, esp_err_to_name(err));
+                    }
                     retryCount++;
-                    ESP_LOGI(WIFI_TAG, "Retrying to connect to the Access Point, attempt: %i/%i",
-                             retryCount, WIFI_CONNECT_RETRY_ATTEMPTS);
+                    LOGI("Retrying to connect to the Access Point, attempt: %i/%i",
+                         retryCount, WIFI_CONNECT_RETRY_ATTEMPTS);
                 } else {
                     xEventGroupSetBits(wifiEventGroup, WIFI_FAIL_BIT);
                 }
                 break;
             case WIFI_EVENT_STA_CONNECTED:
-                ESP_LOGI(WIFI_TAG, "Connected to Access Point");
+                LOGI("Connected to Access Point");
                 break;
             default:
                 break;
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *) event_data;
-        ESP_LOGI(WIFI_TAG, "IP Address: " IPSTR, IP2STR(&event->ip_info.ip));
+        LOGI("IP Address: " IPSTR, IP2STR(&event->ip_info.ip));
         retryCount = 0;
         xEventGroupSetBits(wifiEventGroup, WIFI_CONNECTED_BIT);
     }
 }
 
-private void wifi_initSTA() {
+private void wifi_startSTA() {
     wifiEventGroup = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_netif_init());
@@ -79,12 +86,12 @@ private void wifi_initSTA() {
     esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                                                         ESP_EVENT_ANY_ID,
-                                                        &wifi_eventHandler,
+                                                        &wifi_eventHandlerSTAConnect,
                                                         NULL,
                                                         &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
                                                         IP_EVENT_STA_GOT_IP,
-                                                        &wifi_eventHandler,
+                                                        &wifi_eventHandlerSTAConnect,
                                                         NULL,
                                                         &instance_got_ip));
 
@@ -99,7 +106,7 @@ private void wifi_initSTA() {
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(WIFI_TAG, "Finished WiFi initialization, waiting to connect...");
+    LOGI("Finished Wifi initialization, waiting to connect...");
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
@@ -112,13 +119,13 @@ private void wifi_initSTA() {
     /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually
      * happened. */
     if (bits & WIFI_CONNECTED_BIT) {
-        ESP_LOGI(WIFI_TAG, "Connected to Access Point SSID:%s Password:%s",
-                 WIFI_SSID, WIFI_PASSWORD);
+        LOGI("Connected to Access Point SSID:%s Password:%s",
+             WIFI_SSID, WIFI_PASSWORD);
     } else if (bits & WIFI_FAIL_BIT) {
-        ESP_LOGI(WIFI_TAG, "Failed to connect to SSID:%s Password:%s",
-                 WIFI_SSID, WIFI_PASSWORD);
+        LOGI("Failed to connect to SSID:%s Password:%s",
+             WIFI_SSID, WIFI_PASSWORD);
     } else {
-        ESP_LOGE(WIFI_TAG, "UNEXPECTED EVENT");
+        LOGE("UNEXPECTED EVENT");
     }
 
     /* The event will not be processed after unregister */
@@ -127,16 +134,45 @@ private void wifi_initSTA() {
     vEventGroupDelete(wifiEventGroup);
 }
 
-public esp_err_t wifi_init() {
-    // Initialize NVS which is needed for some reason
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
+private void wifi_startAP() {
 
-    ESP_LOGI(WIFI_TAG, "Initializing WiFi in STA mode");
-    wifi_initSTA();
-    return 0;
+}
+
+public esp_err_t wifi_init() {
+    // Initialize NVS which is needed for WiFi and Bluetooth, see https://community.platformio.org/t/understanding-nvs-better/25548
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(err);
+    currentWifiMode = WIFI_MODE_NULL;
+    currentState = STOPPED;
+    return ESP_OK;
+}
+
+public esp_err_t wifi_start(WifiMode wifiMode) {
+    if (wifiMode == WIFI_MODE_STA) {
+        currentWifiMode = wifiMode;
+        LOGI("Initializing Wifi service in STA mode");
+        wifi_startSTA();
+    } else if (wifiMode == WIFI_MODE_AP) {
+        currentWifiMode = wifiMode;
+        LOGI("Initializing Wifi service in AP mode");
+        wifi_startAP();
+    } else {
+        LOGE("Cannot start Wifi service in mode: %i, only STA (%i) and AP (%i) are allowed",
+             wifiMode, WIFI_MODE_STA, WIFI_MODE_AP);
+        return ESP_ERR_INVALID_ARG;
+    }
+    currentState = STARTED;
+    return ESP_OK;
+}
+
+public WifiMode wifi_getCurrentMode() {
+    return currentWifiMode;
+}
+
+public esp_err_t wifi_stop() {
+    return ESP_OK;
 }
