@@ -1,18 +1,19 @@
 #include "utils.h"
 #include "services/wifi.h"
+#include "services/webserver.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 private void setup() {
     wifi_init();
+    webServer_init();
 }
 
 private void loop() {
 
 }
 
-_Noreturn
-public  void app_main() {
+public void app_main() {
     setup();
-    while (true) {
-        loop();
-    }
+    vTaskDelay(portMAX_DELAY);
 }

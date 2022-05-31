@@ -2,7 +2,38 @@
 
 Work in progress
 
-## Configuring
+## Hardware
+
+### Adafruit HUZZAH32 ESP32 Feather
+
+[Manufacturer Site](https://learn.adafruit.com/adafruit-huzzah32-esp32-feather)
+[Digi-Key](https://www.digikey.co.uk/en/products/detail/adafruit-industries-llc/3591/8119805)
+[ThePiHut](https://thepihut.com/products/adafruit-huzzah32-esp32-feather-board-pre-soldered-ada3591)
+
+A very high quality, and feature-rich ESP32 board with a built-in Lithium Ion/Polymer battery
+charger. It's on the expensive side, but the built-in battery charger (and the pre-soldered versions from
+ThePiHut) make it worthwhile, especially if used for multiple or complex projects.
+
+### Arducam 5MP OV5642 Mini SPI Camera Module
+
+[Manufacturer Site](https://www.arducam.com/product/arducam-5mp-plus-spi-cam-arduino-ov5642/)
+[Digi-Key](https://www.digikey.co.uk/en/products/detail/sparkfun-electronics/DEV-18440/15203664)
+[ThePiHut](https://thepihut.com/products/5mp-ov5642-mini-spi-camera-module-for-arduino)
+
+This is an excellent, high-quality, simple camera module that uses SPI (and I2C for commands) for communicating
+with any microcontroller. You can attach any M12 Lens on the camera for different viewing angles.
+
+### Battery
+
+TODO
+
+### SD-Card Module
+
+TODO
+
+## Software Development
+
+### Software Setup
 
 Follow the 
 [ESP-IDF installation guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/linux-macos-setup.html)
