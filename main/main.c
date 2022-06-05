@@ -1,19 +1,19 @@
 #include "utils.h"
-#include "services/wifi.h"
-#include "services/webserver.h"
+#include "services/WifiService.h"
+#include "services/WebServer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 private void setup() {
-    wifi_init();
-    webServer_init();
+    WifiService.init();
+    WifiService.connect(WIFI_MODE_STA);
+    WebServer.init();
 }
 
-private void loop() {
-
-}
-
+__attribute__((__noreturn__, __used__))
 public void app_main() {
     setup();
-    vTaskDelay(portMAX_DELAY);
+    while (true) {
+        vTaskDelay(portMAX_DELAY);
+    }
 }

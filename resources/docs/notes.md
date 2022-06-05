@@ -14,3 +14,7 @@ wifi access point.
 The camera should have a button to signal that the user would like to save the last clip (however 
 long we decide to set it, 15 or 30 seconds is good) similar to how some car dash-cams do this. 
 These clips get saved into the SD card. 
+
+## Over-The-Air Update Feature
+It would be very cool to allow for Over-The-Air (OTA) software updates like how some routers do
+this. This could be very complicated though but is a good flex of skills
