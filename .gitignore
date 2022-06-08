@@ -2,7 +2,5 @@ cmake-build*/
 .idea/
 build/
 
-sdkconfig
-
 # header file with passwords and API keys
 main/secrets.h
