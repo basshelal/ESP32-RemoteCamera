@@ -17,14 +17,14 @@ extern void log_removeLogFunction(const LogFunction logFunction);
 
 extern void log(const LogLevel logLevel, const char *tag, const char *format, ...);
 
-extern void logE();
+extern void logE(const char *tag, const char *format, ...);
 
-extern void logW();
+extern void logW(const char *tag, const char *format, ...);
 
-extern void logI();
+extern void logI(const char *tag, const char *format, ...);
 
-extern void logD();
+extern void logD(const char *tag, const char *format, ...);
 
-extern void logV();
+extern void logV(const char *tag, const char *format, ...);
 
 #endif //ESP32_REMOTECAMERA_LOGSERVICE_H

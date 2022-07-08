@@ -1,6 +1,8 @@
-#include "List.h"
-#include "utils.h"
+#include "include/List.h"
 #include <stdlib.h>
+
+#define private static
+#define public /*public*/
 
 typedef struct ListData {
     /** List options set at creation time */
