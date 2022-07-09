@@ -2,6 +2,8 @@
 #include "List.h"
 #include "unity.h"
 
+// TODO: 09-Jul-2022 @basshelal: Cleaner smaller tests, use macro helpers if needed
+
 #define LIST_TAG "[list]"
 
 int myInt = 69;
@@ -70,6 +72,7 @@ TEST_CASE("Create List with Options error callback", LIST_TAG) {
 
     UNITY_TEST_ASSERT_GREATER_THAN_INT(0, callbackCalled, __LINE__, "Error callback should have been called");
     list_destroy(list);
+    callbackCalled = 0;
 }
 
 TEST_CASE("List Size", LIST_TAG) {
@@ -140,4 +143,47 @@ TEST_CASE("Access items after list destroy", LIST_TAG) {
         snprintf(stringBuffer, 128, "Pointer failed at %i", i);
         UNITY_TEST_ASSERT_EQUAL_INT(myInt, myItem[i * sizeof(int)], __LINE__, stringBuffer);
     }
+}
+
+TEST_CASE("List change item data", LIST_TAG) {
+    // TODO: 09-Jul-2022 @basshelal: Item is added to list then changed here, should be reflected when calling list
+    //  .get() including with NULL
+}
+
+TEST_CASE("List growth", LIST_TAG) {
+    ListOptions *listOptions = list_defaultListOptions();
+    listOptions->capacity = 1;
+    listOptions->isGrowable = true;
+    List *list = list_createOptions(listOptions);
+
+    list_addItem(list, &myInt);
+
+    UNITY_TEST_ASSERT_EQUAL_INT(1, list_size(list), __LINE__, "List size was incorrect");
+
+    const int myOtherInt = 420;
+
+    list_addItem(list, &myOtherInt);
+
+    UNITY_TEST_ASSERT_EQUAL_INT(2, list_size(list), __LINE__, "List size was incorrect");
+
+    UNITY_TEST_ASSERT_EQUAL_INT(myInt, *((int *) list_getItem(list, 0)), __LINE__, "");
+    UNITY_TEST_ASSERT_EQUAL_INT(myOtherInt, *((int *) list_getItem(list, 1)), __LINE__, "");
+
+    list_destroy(list);
+}
+
+TEST_CASE("List set and get items", LIST_TAG) {
+    // TODO: 09-Jul-2022 @basshelal: Set and get items indexed and including NULL
+}
+
+TEST_CASE("List IndexOf", LIST_TAG) {
+    // TODO: 09-Jul-2022 @basshelal: Duplicates and non-existent
+}
+
+TEST_CASE("List add item", LIST_TAG) {
+    // TODO: 09-Jul-2022 @basshelal: Add item, add item indexed including NULL
+}
+
+TEST_CASE("List remove item", LIST_TAG) {
+    // TODO: 09-Jul-2022 @basshelal: Remove item, add item indexed including NULL and non-existent and duplicate
 }

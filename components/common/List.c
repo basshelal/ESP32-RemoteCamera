@@ -36,19 +36,20 @@ private void list_grow(ListData *listData) {
 }
 
 /** Shift all elements from startIndex (inclusive) until last element forward by one */
-private void list_shiftRight(ListData *listData, const index_t startIndex) {
+private ListError list_shiftRight(ListData *listData, const index_t startIndex) {
     if (listData->size == listData->options.capacity) { // reached the limit, need to grow
         if (listData->options.isGrowable) // grow only if enabled
             list_grow(listData);
         else { // otherwise error and do nothing
             list_error(listData, LIST_ERROR_CAPACITY_EXCEEDED);
-            return;
+            return LIST_ERROR_CAPACITY_EXCEEDED;
         }
     }
     const index_t lastIndex = listData->size - 1;
     for (int i = lastIndex; i >= startIndex; i--) { // must loop backwards
         listData->items[i + 1] = listData->items[i];
     }
+    return LIST_ERROR_NONE;
 }
 
 /** Shift all elements from end until endIndex (exclusive) backward by one */
@@ -119,19 +120,20 @@ public ListItem *list_getItem(const List *list, const index_t index) {
     return listData->items[index];
 }
 
-public void list_setItem(const List *list, const index_t index, const ListItem *item) {
-    if (!list) return;
+public ListError list_setItem(const List *list, const index_t index, const ListItem *item) {
+    if (!list) return LIST_ERROR_NULL_LIST;
     ListData *listData = (ListData *) list;
     const index_t lastIndex = listData->size - 1;
     if (index < 0) {
         list_error(listData, LIST_ERROR_NEGATIVE_INDEX);
-        return;
+        return LIST_ERROR_NEGATIVE_INDEX;
     }
     if (index > lastIndex) {
         list_error(listData, LIST_ERROR_INDEX_OUT_OF_BOUNDS);
-        return;
+        return LIST_ERROR_INDEX_OUT_OF_BOUNDS;
     }
     listData->items[index] = item;
+    return LIST_ERROR_NONE;
 }
 
 public index_t list_indexOfItem(const List *list, const ListItem *item) {
@@ -149,8 +151,8 @@ public index_t list_indexOfItemFunction(const List *list, const ListItem *item,
     return -1;
 }
 
-public void list_addItem(const List *list, const ListItem *item) {
-    if (!list) return;
+public ListError list_addItem(const List *list, const ListItem *item) {
+    if (!list) return LIST_ERROR_NULL_LIST;
     ListData *listData = (ListData *) list;
     const index_t lastIndex = listData->size - 1;
     if (listData->size == listData->options.capacity) { // reached the limit, need to grow
@@ -158,65 +160,69 @@ public void list_addItem(const List *list, const ListItem *item) {
             list_grow(listData);
         else { // otherwise error and do nothing
             list_error(listData, LIST_ERROR_CAPACITY_EXCEEDED);
-            return;
+            return LIST_ERROR_CAPACITY_EXCEEDED;
         }
     }
     listData->items[lastIndex + 1] = item;
     listData->size++;
+    return LIST_ERROR_NONE;
 }
 
-public void list_addItemIndexed(const List *list, const index_t index, const ListItem *item) {
-    if (!list) return;
+public ListError list_addItemIndexed(const List *list, const index_t index, const ListItem *item) {
+    if (!list) return LIST_ERROR_NULL_LIST;
     ListData *listData = (ListData *) list;
     const index_t lastIndex = listData->size - 1;
     if (index < 0) {
         list_error(listData, LIST_ERROR_NEGATIVE_INDEX);
-        return;
+        return LIST_ERROR_NEGATIVE_INDEX;
     }
     if (index > lastIndex) {
         list_error(listData, LIST_ERROR_INDEX_OUT_OF_BOUNDS);
-        return;
+        return LIST_ERROR_INDEX_OUT_OF_BOUNDS;
     }
     if (index == lastIndex) {
-        list_addItem(list, item);
-        return;
+        return list_addItem(list, item);
     } else {
-        list_shiftRight(listData, index);
-        listData->size++;
-        list_setItem(list, lastIndex, item);
+        ListError err;
+        if ((err = list_shiftRight(listData, index)) == LIST_ERROR_NONE) {
+            listData->size++;
+            return list_setItem(list, lastIndex, item);
+        } else {
+            return err;
+        }
     }
 }
 
-public void list_removeItem(const List *list, const ListItem *item) {
-    if (!list) return;
+public ListError list_removeItem(const List *list, const ListItem *item) {
+    if (!list) return LIST_ERROR_NULL_LIST;
     ListData *listData = (ListData *) list;
     const index_t itemIndex = list_indexOfItem(list, item);
     if (itemIndex < 0) { // item was not found
         list_error(listData, LIST_ERROR_ITEM_NOT_FOUND);
-        return;
+        return LIST_ERROR_ITEM_NOT_FOUND;
     } else {
-        list_removeItemIndexed(list, itemIndex);
+        return list_removeItemIndexed(list, itemIndex);
     }
 }
 
-public void list_removeItemIndexed(const List *list, const index_t index) {
-    if (!list) return;
+public ListError list_removeItemIndexed(const List *list, const index_t index) {
+    if (!list) return LIST_ERROR_NULL_LIST;
     ListData *listData = (ListData *) list;
     const index_t lastIndex = listData->size - 1;
     if (index < 0) {
         list_error(listData, LIST_ERROR_NEGATIVE_INDEX);
-        return;
+        return LIST_ERROR_NEGATIVE_INDEX;
     }
     if (index > lastIndex) {
         list_error(listData, LIST_ERROR_INDEX_OUT_OF_BOUNDS);
-        return;
+        return LIST_ERROR_INDEX_OUT_OF_BOUNDS;
     }
     if (index == lastIndex) {
         listData->size--;
-        return;
     } else {
         list_shiftLeft(listData, index);
         listData->size--;
     }
+    return LIST_ERROR_NONE;
 }
 

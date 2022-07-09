@@ -27,6 +27,8 @@ typedef int capacity_t;
 typedef enum ListError {
     /** No error */
     LIST_ERROR_NONE = 0,
+    /** List is NULL */
+    LIST_ERROR_NULL_LIST,
     /** When capacity exceeded and must grow but isGrowable is false */
     LIST_ERROR_CAPACITY_EXCEEDED,
     /** When a requested item was not found */
@@ -79,7 +81,7 @@ extern ListItem *list_getItem(const List *list, const index_t index);
 
 /** Set the item at the index, the list will not be modified in any other way,
  * does nothing if list is NULL or index is out of bounds */
-extern void list_setItem(const List *list, const index_t index, const ListItem *item);
+extern ListError list_setItem(const List *list, const index_t index, const ListItem *item);
 
 /** Get the index of the first instance of item or -1 if it was not found or list was NULL
  * item can be NULL, in which case will find the first instance of NULL in the list,
@@ -93,15 +95,15 @@ extern index_t list_indexOfItemFunction(const List *list, const ListItem *item,
 
 /** Add item to the back/end of the list, growing the list if necessary and enabled
  * if growing is necessary but not enabled then no modifications are made */
-extern void list_addItem(const List *list, const ListItem *item);
+extern ListError list_addItem(const List *list, const ListItem *item);
 
 /** Add item to the index, pushing forward items with a higher index and growing if necessary */
-extern void list_addItemIndexed(const List *list, const index_t index, const ListItem *item);
+extern ListError list_addItemIndexed(const List *list, const index_t index, const ListItem *item);
 
 /** Removes the item if it was found in the list, pushing back items with a higher index if necessary */
-extern void list_removeItem(const List *list, const ListItem *item);
+extern ListError list_removeItem(const List *list, const ListItem *item);
 
 /** Removes the item at the index, pushing back items with a higher index if necessary  */
-extern void list_removeItemIndexed(const List *list, const index_t index);
+extern ListError list_removeItemIndexed(const List *list, const index_t index);
 
 #endif //ESP32_REMOTECAMERA_LIST_H
