@@ -25,6 +25,8 @@ typedef int index_t;
 typedef int capacity_t;
 
 typedef enum ListError {
+    /** No error */
+    LIST_ERROR_NONE = 0,
     /** When capacity exceeded and must grow but isGrowable is false */
     LIST_ERROR_CAPACITY_EXCEEDED,
     /** When a requested item was not found */

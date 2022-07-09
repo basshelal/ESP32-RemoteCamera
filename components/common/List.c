@@ -161,7 +161,7 @@ public void list_addItem(const List *list, const ListItem *item) {
             return;
         }
     }
-    list_setItem(list, lastIndex, item);
+    listData->items[lastIndex + 1] = item;
     listData->size++;
 }
 
