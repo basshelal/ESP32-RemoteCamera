@@ -1,3 +1,3 @@
 idf_component_register(SRC_DIRS "."
         INCLUDE_DIRS "."
-        PRIV_REQUIRES cmock unity common)
+        PRIV_REQUIRES cmock unity common test-utils)

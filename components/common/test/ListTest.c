@@ -1,6 +1,7 @@
 #include <memory.h>
 #include "List.h"
 #include "unity.h"
+#include "TestUtils.h"
 
 // TODO: 09-Jul-2022 @basshelal: Cleaner smaller tests, use macro helpers if needed
 
@@ -10,7 +11,7 @@ int myInt = 69;
 
 TEST_CASE("Create List", LIST_TAG) {
     List *list = list_create();
-    UNITY_TEST_ASSERT_NOT_NULL(list, __LINE__, "List should be non-null");
+    ASSERT_NOT_NULL(list, "List should be non-null");
     list_destroy(list);
 }
 
@@ -22,14 +23,13 @@ TEST_CASE("Create List with Options Capacity and isGrowable", LIST_TAG) {
             .errorCallback = NULL
     };
     List *list = list_createOptions(&listOptions);
-    UNITY_TEST_ASSERT_NOT_NULL(list, __LINE__, "List should be non-null");
+    ASSERT_NOT_NULL(list, "List should be non-null");
 
     list_addItem(list, &myInt);
     list_addItem(list, &myInt);
     list_addItem(list, &myInt);
 
-    UNITY_TEST_ASSERT_EQUAL_INT(listOptions.capacity, list_size(list), __LINE__,
-                                "List size should not be larger than it's capacity");
+    ASSERT_INT_EQUAL(listOptions.capacity, list_size(list), "List size should not be larger than it's capacity");
     list_destroy(list);
 }
 
@@ -41,13 +41,12 @@ TEST_CASE("Create List with Options growth factor", LIST_TAG) {
             .errorCallback = NULL
     };
     List *list = list_createOptions(&listOptions);
-    UNITY_TEST_ASSERT_NOT_NULL(list, __LINE__, "List should be non-null");
+    ASSERT_NOT_NULL(list, "List should be non-null");
 
     list_addItem(list, &myInt);
     list_addItem(list, &myInt);
 
-    UNITY_TEST_ASSERT_EQUAL_INT(2, list_size(list), __LINE__,
-                                "List size should be 2");
+    ASSERT_INT_EQUAL(2, list_size(list), "List size should be 2");
     list_destroy(list);
 }
 
@@ -65,18 +64,18 @@ TEST_CASE("Create List with Options error callback", LIST_TAG) {
             .errorCallback = error_callback
     };
     List *list = list_createOptions(&listOptions);
-    UNITY_TEST_ASSERT_NOT_NULL(list, __LINE__, "List should be non-null");
+    ASSERT_NOT_NULL(list, "List should be non-null");
 
     list_addItem(list, &myInt);
     list_addItem(list, &myInt);
 
-    UNITY_TEST_ASSERT_GREATER_THAN_INT(0, callbackCalled, __LINE__, "Error callback should have been called");
+    ASSERT_INT_GREATER_THAN(0, callbackCalled, "Error callback should have been called");
     list_destroy(list);
     callbackCalled = 0;
 }
 
 TEST_CASE("List Size", LIST_TAG) {
-    UNITY_TEST_ASSERT_EQUAL_INT(-1, list_size(NULL), __LINE__, "Null list size should be -1");
+    ASSERT_INT_EQUAL(-1, list_size(NULL), "Null list size should be -1");
 
     List *list = list_create();
 
@@ -85,21 +84,21 @@ TEST_CASE("List Size", LIST_TAG) {
         list_addItem(list, &myInt);
     }
 
-    UNITY_TEST_ASSERT_EQUAL_INT(mySize, list_size(list), __LINE__, "List size was incorrect");
+    ASSERT_INT_EQUAL(mySize, list_size(list), "List size was incorrect");
 
     list_destroy(list);
 }
 
 TEST_CASE("List isEmpty", LIST_TAG) {
-    UNITY_TEST_ASSERT_EQUAL_INT(true, list_isEmpty(NULL), __LINE__, "Null List isEmpty should be true");
+    ASSERT_INT_EQUAL(true, list_isEmpty(NULL), "Null List isEmpty should be true");
 
     List *list = list_create();
 
-    UNITY_TEST_ASSERT_EQUAL_INT(true, list_isEmpty(list), __LINE__, "List isEmpty should be true");
+    ASSERT_INT_EQUAL(true, list_isEmpty(list), "List isEmpty should be true");
 
     list_addItem(list, &myInt);
 
-    UNITY_TEST_ASSERT_EQUAL_INT(false, list_isEmpty(list), __LINE__, "List isEmpty should be false");
+    ASSERT_INT_EQUAL(false, list_isEmpty(list), "List isEmpty should be false");
 
     list_destroy(list);
 }
@@ -111,9 +110,9 @@ TEST_CASE("List get item", LIST_TAG) {
 
     int *result = (int *) list_getItem(list, 0);
 
-    UNITY_TEST_ASSERT_NOT_NULL(result, __LINE__, "Result should not be null");
+    ASSERT_NOT_NULL(result, "Result should not be null");
 
-    UNITY_TEST_ASSERT_EQUAL_INT(myInt, *result, __LINE__, "List get item was incorrect");
+    ASSERT_INT_EQUAL(myInt, *result, "List get item was incorrect");
 
     list_destroy(list);
 }
@@ -130,18 +129,18 @@ TEST_CASE("Access items after list destroy", LIST_TAG) {
 
     list_addItem(list, myItem);
 
-    UNITY_TEST_ASSERT_EQUAL_MEMORY(myItem, list_getItem(list, 0), size, __LINE__, "Items should be identical");
+    ASSERT_MEMORY_EQUAL(myItem, list_getItem(list, 0), size, "Items should be identical");
 
     list_destroy(list);
 
     list = NULL;
 
-    UNITY_TEST_ASSERT_NOT_NULL(myItem, __LINE__, "Pointer should not be null");
+    ASSERT_NOT_NULL(myItem, "Pointer should not be null");
 
     char stringBuffer[128];
     for (int i = 0; i < itemCount; i++) {
         snprintf(stringBuffer, 128, "Pointer failed at %i", i);
-        UNITY_TEST_ASSERT_EQUAL_INT(myInt, myItem[i * sizeof(int)], __LINE__, stringBuffer);
+        ASSERT_INT_EQUAL(myInt, myItem[i * sizeof(int)], stringBuffer);
     }
 }
 
@@ -158,16 +157,16 @@ TEST_CASE("List growth", LIST_TAG) {
 
     list_addItem(list, &myInt);
 
-    UNITY_TEST_ASSERT_EQUAL_INT(1, list_size(list), __LINE__, "List size was incorrect");
+    ASSERT_INT_EQUAL(1, list_size(list), "List size was incorrect");
 
     const int myOtherInt = 420;
 
     list_addItem(list, &myOtherInt);
 
-    UNITY_TEST_ASSERT_EQUAL_INT(2, list_size(list), __LINE__, "List size was incorrect");
+    ASSERT_INT_EQUAL(2, list_size(list), "List size was incorrect");
 
-    UNITY_TEST_ASSERT_EQUAL_INT(myInt, *((int *) list_getItem(list, 0)), __LINE__, "");
-    UNITY_TEST_ASSERT_EQUAL_INT(myOtherInt, *((int *) list_getItem(list, 1)), __LINE__, "");
+    ASSERT_INT_EQUAL(myInt, *((int *) list_getItem(list, 0)), "");
+    ASSERT_INT_EQUAL(myOtherInt, *((int *) list_getItem(list, 1)), "");
 
     list_destroy(list);
 }

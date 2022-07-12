@@ -23,15 +23,21 @@ ThePiHut) make it worthwhile, especially if used for multiple or complex project
 This is an excellent, high-quality, simple camera module that uses SPI (and I2C for commands) for communicating
 with any microcontroller. You can attach any M12 Lens on the camera for different viewing angles.
 
+### MicroSD Card Module
+
+[Manufacturer Site](https://www.adafruit.com/product/254)
+[Digi-Key](https://www.digikey.co.uk/en/products/detail/adafruit-industries-llc/254/5761230)
+[ThePiHut](https://thepihut.com/products/adafruit-microsd-card-breakout-board)
+
+High quality feature-rich (somewhat expensive), MicroSD Card Module. MicroSD Card Modules are known
+to be fussy about signal integrity, so I recommend using tight and secure wires, and soldering the 
+included headers.
+
 ### Battery
 
 TODO
 
-### SD-Card Module
-
-TODO
-
-## Software Development
+## Software
 
 ### Software Setup
 
@@ -51,10 +57,10 @@ export IDF_PYTHON_ENV_PATH="/usr/bin/python3.8"
 
 alias esp-export=". $IDF_PATH/export.sh"
 ```
-Change the above appropriately, you will need to call `esp-export` once before any ESP-IDF operations
-such as `idf.py build`
+Change the above appropriately, you will need to call `esp-export` once per terminal session before 
+any ESP-IDF operations such as `idf.py build`
 
-### CLion
+#### CLion
 
 Add the environment script [`./setup-env.sh`](./setup-env.sh) to the current toolchain
 so that CLion loads the path variables correctly, this solves the issue with unknown C, CXX and ASM compilers
@@ -62,3 +68,15 @@ as well as any "missing dependencies" problems that CMake would otherwise exclai
 see [JetBrains' guide](https://www.jetbrains.com/help/clion/how-to-create-toolchain-in-clion.html#env-scripts)
 for how to do this and read more about ESP-IDF setup on CLion 
 [here](https://www.jetbrains.com/help/clion/esp-idf.html).
+
+##### Multi-root CMake Project
+
+CLion is not yet capable of functioning with multiple root CMake projects. This project has 2 CMake roots,
+[`./main/`](./main/) (the main component with the actual application) and [`./test/`](./test/) 
+(the test component for running unit tests on device). The IDE will only *"be aware"* of 1 of these after
+right-clicking "Load CMake Project" on [`./CMakeLists.txt`](./CMakeLists.txt) for `main` or
+[`./test/CMakeLists.txt`](./test/CMakeLists.txt) for `test`. When one is loaded the other will have errors
+in the IDE despite being able to build and run both from `idf.py` or `cmake` directly from the command-line.
+It is a minor inconvenience that you will need to "Load CMake Project" when switching between editing either
+of these components, but at least it makes sense as these are the only 2 *"applications"* that can be run 
+on the device and only one can be run at a given time.

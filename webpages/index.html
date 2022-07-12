@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ESP32 Remote Camera</title>
+</head>
+<body>
+<p>Hello world from a HTML webpage on the ESP32 Flash</p>
+<button id="myButton">Click me!</button>
+<p id="myText"></p>
+<script>
+    let clicks = 0;
+    document.getElementById("myButton").onclick = () => {
+        clicks++
+        document.getElementById("myText").innerHTML = `Button was clicked ${clicks} times!`
+    }
+</script>
+</body>
+</html>
