@@ -86,6 +86,8 @@ public const char *battery_text() {
     //  for this we can log all of the voltages throughout its life into a CSV and find the curve and see if we can
     //  reverse it to get a more linear change if possible
 
+    // TODO: 18-Jul-2022 @basshelal: Charging seems to add an additional .05V to the battery
+
     const uint32_t espVoltage = esp_adc_cal_raw_to_voltage(averagedRaw, adc_chars);
     const float calculatedVoltage = ((float) espVoltage * 2.0F) / 1000.0F;
 

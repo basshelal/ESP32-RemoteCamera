@@ -1,9 +1,5 @@
 # TODO
 
-## Build System
-* Add a build step to CMake to call `npm build` in the `webclient` directory to build
-  the latest UI.
-
 ## Internal Storage
 * Internal storage should get, put and delete key value pairs
 * Internal storage should get files (such as index.html)
@@ -35,3 +31,10 @@
 * Take videos and store to SD Card
 * Record continuously live video and encode into HLS livestream, this may be complex enough to require
   its own component or file. The video data should probably live in memory as storage writes are expensive.
+
+## Battery
+* See if we can get better information, such as more accurate battery reading (directly from BAT pin)
+  and being aware of USB presence to know if we are charging or not (from USB pin)
+* Better battery percentage function that converts the voltage lifecycle to a more linear percentage,
+  this can only be done by sampling the battery's life and finding the curve and correcting it to be 
+  linear

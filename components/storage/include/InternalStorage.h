@@ -5,4 +5,6 @@
 #include "StorageError.h"
 #include <stdio.h>
 
+extern StorageError internalStorage_init();
+
 #endif //ESP32_REMOTECAMERA_INTERNALSTORAGE_H

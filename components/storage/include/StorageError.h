@@ -3,6 +3,7 @@
 
 typedef enum {
     STORAGE_ERROR_NONE = 0,
+    STORAGE_ERROR_NVS_INIT_FAIL,
 } StorageError;
 
 #endif //ESP32_REMOTECAMERA_STORAGEERROR_H
