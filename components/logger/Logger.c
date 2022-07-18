@@ -1,12 +1,14 @@
-#include "LogService.h"
-#include "List.h"
-#include <esp_log.h>
+#include <stdio.h>
+#include "Logger.h"
+#include "esp_log.h"
 
 private struct {
     List *logFunctionsList;
 } logData;
 
-private inline esp_log_level_t logLevelToEspLogLevel(const LogLevel logLevel) {
+private inline esp_log_level_t
+
+logLevelToEspLogLevel(const LogLevel logLevel) {
     // currently they line up perfectly so no need to do anything
     return (esp_log_level_t) logLevel;
 }
@@ -29,16 +31,16 @@ public void log_removeLogFunction(const LogFunction logFunction) {
     list_removeItem(logData.logFunctionsList, logFunction);
 }
 
-public void log(const LogLevel logLevel, const char *tag, const char *format, ...) {
-    va_list vargs;
-    va_start(vargs, format);
-    // ESP_LOG_LEVEL();
-    esp_log_writev(logLevelToEspLogLevel(logLevel), tag, format, vargs);
-//    for (int i = 0; i < list_size(logData.logFunctionsList); i++) {
-//        LogFunction function = (LogFunction) list_getItem(logData.logFunctionsList, i);
-//        function(logLevel, tag, format, vargs);
-//    }
-    va_end(vargs);
+public void log(const LogLevel logLevel, const char *tag, const char *format, const va_list vargs) {
+    private char string[1024];
+    vsprintf(string, format, vargs);
+    ESP_LOG_LEVEL(logLevelToEspLogLevel(logLevel), tag, "%s", string);
+    for (int i = 0; i < list_size(logData.logFunctionsList); i++) {
+        LogFunction function = (LogFunction) list_getItem(logData.logFunctionsList, i);
+        if (function != NULL) {
+            function(logLevel, tag, string);
+        }
+    }
 }
 
 public void logE(const char *tag, const char *format, ...) {

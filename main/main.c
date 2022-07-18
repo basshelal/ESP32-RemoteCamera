@@ -1,5 +1,6 @@
-#include "utils.h"
-#include "services/LogService.h"
+#include <esp_log.h>
+#include "Utils.h"
+#include "Logger.h"
 #include "services/WifiService.h"
 #include "services/WebServer.h"
 #include "services/DataStore.h"
@@ -18,11 +19,11 @@ private void setup() {
     battery_init();
 }
 
-__attribute__((__noreturn__, __used__))
+attr(__used__) attr(__noreturn__)
 public void app_main() {
     setup();
     while (true) {
-        battery_read();
+        logI("Battery", "%s", battery_text());
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

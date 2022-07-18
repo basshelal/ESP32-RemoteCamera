@@ -13,8 +13,6 @@
  * variables) unless the list itself is also on the stack. Otherwise, you should free the items only
  * after you have destroyed the list or at the very least, stopped using it.
  */
-
-/** Opaque pointer for a List */
 typedef void List;
 
 /** Opaque pointer for a ListItem, safe to cast to any pointer */
@@ -105,5 +103,10 @@ extern ListError list_removeItem(const List *list, const ListItem *item);
 
 /** Removes the item at the index, pushing back items with a higher index if necessary  */
 extern ListError list_removeItemIndexed(const List *list, const index_t index);
+
+/** Nominally clears the list,
+ * the elements in the list are still safe to use and should be freed or cleaned up by the caller
+ * Any further modifications to the list will overwrite into memory locations of old elements */
+extern ListError list_clear(const List *list);
 
 #endif //ESP32_REMOTECAMERA_LIST_H

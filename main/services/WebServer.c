@@ -1,10 +1,10 @@
 #include "WebServer.h"
-#include "utils.h"
 
 #include <string.h>
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_http_server.h"
+#include "Battery.h"
 
 static const char *TAG = "WebServer";
 
@@ -19,11 +19,11 @@ static const char *TAG = "WebServer";
 //  this may or not be placed here in this service
 
 private esp_err_t webServer_getHandler(httpd_req_t *request) {
-    ESP_LOGI(TAG, "Request to URI: %s", request->uri);
+    //ESP_LOGI(TAG, "Request to URI: %s", request->uri);
     httpd_resp_set_status(request, HTTPD_200);
-    httpd_resp_sendstr_chunk(request, "Hello World!");
+    httpd_resp_sendstr_chunk(request, battery_text());
     httpd_resp_send_chunk(request, NULL, 0);
-    ESP_LOGI(TAG, "Responding...");
+    //ESP_LOGI(TAG, "Responding...");
     return ESP_OK;
 }
 
@@ -54,7 +54,3 @@ public esp_err_t webServer_init() {
 
     return ESP_OK;
 }
-
-public typeof(WebServer) WebServer = {
-        .init = webServer_init,
-};

@@ -67,6 +67,8 @@ public ListOptions *list_defaultListOptions() {
             .growthFactor = LIST_GROWTH_FACTOR,
             .errorCallback = NULL
     };
+    // TODO: 17-Jul-2022 @basshelal: Check memory lifecycle of this! Options probably should be a pointer in listData
+    //  that gets freed at destruction
     *options = o;
     return options;
 }
@@ -226,3 +228,9 @@ public ListError list_removeItemIndexed(const List *list, const index_t index) {
     return LIST_ERROR_NONE;
 }
 
+public ListError list_clear(const List *list) {
+    if (!list) return LIST_ERROR_NULL_LIST;
+    ListData *listData = (ListData *) list;
+    listData->size = 0;
+    return LIST_ERROR_NONE;
+}

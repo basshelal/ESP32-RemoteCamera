@@ -1,6 +1,7 @@
 #ifndef ESP32_REMOTECAMERA_WIFISERVICE_H
 #define ESP32_REMOTECAMERA_WIFISERVICE_H
 
+#include "Utils.h"
 #include <esp_err.h>
 #include <esp_wifi_types.h>
 

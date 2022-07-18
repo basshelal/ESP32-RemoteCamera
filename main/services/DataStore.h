@@ -1,7 +1,7 @@
 #ifndef ESP32_REMOTECAMERA_DATASTORE_H
 #define ESP32_REMOTECAMERA_DATASTORE_H
 
-#include "utils.h"
+#include "Utils.h"
 #include <esp_err.h>
 
 extern struct {

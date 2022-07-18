@@ -1,5 +1,4 @@
 #include "WifiService.h"
-#include "utils.h"
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
