@@ -28,4 +28,21 @@ extern StorageError internalStorage_deleteKey(const InternalStorageKey *key);
 
 extern bool internalStorage_hasKey(const InternalStorageKey *key);
 
+extern StorageError internalStorage_readFile(const char *filePath,
+                                             void *bufferIn in_parameter,
+                                             const uint bufferLength,
+                                             uint *bytesRead in_parameter);
+
+extern StorageError internalStorage_writeFile(const char *filePath,
+                                              const void *buffer in_parameter,
+                                              const uint bufferLength,
+                                              uint *bytesWritten in_parameter);
+
+extern bool internalStorage_queryFileExists(const char *filePath);
+
+extern StorageError internalStorage_queryFileSize(const char *filePath, uint *fileSizeBytesIn in_parameter);
+
+extern StorageError internalStorage_deleteFile(const char *filePath);
+
+
 #endif //ESP32_REMOTECAMERA_INTERNALSTORAGE_H

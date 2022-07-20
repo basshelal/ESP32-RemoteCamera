@@ -40,7 +40,7 @@ extern void logV(const char *tag, const char *format, ...);
 #ifdef LOG_TAG
 #define LOG_TEMPLATE(s, ...) LOG_TAG, "%s %d"s, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
 #else
-#define LOG_TEMPLATE(s, ...) __FILE_NAME__, "%s %d"s, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
+#define LOG_TEMPLATE(s, ...) __FILE__, "%s %d"s, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
 #endif
 
 #define ERROR(message, ...) logE(LOG_TEMPLATE(message, ##__VA_ARGS__))

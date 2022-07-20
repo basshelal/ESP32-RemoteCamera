@@ -14,28 +14,28 @@ public StorageError nvs_init() {
     VERBOSE("Initializing NVS");
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NOT_FOUND) {
-        throw(STORAGE_ERROR_NVS_PARTITION_NOT_FOUND, "No partition with label \"%s\", cannot proceed!", NVS_PARTITION);
+        throw(STORAGE_ERROR_PARTITION_NOT_FOUND, "No partition with label \"%s\", cannot proceed!", NVS_PARTITION);
     }
     if (err == ESP_ERR_NVS_NO_FREE_PAGES //  NVS storage contains no empty pages (partition was truncated)
         || err == ESP_ERR_NVS_NEW_VERSION_FOUND) { // NVS partition contains data in new format
         VERBOSE("nvs_flash_init() failed, erasing and retrying");
         err = nvs_flash_erase();
         if (err == ESP_ERR_NOT_FOUND) {
-            throw(STORAGE_ERROR_NVS_PARTITION_NOT_FOUND, "No partition with label \"%s\", cannot proceed!",
+            throw(STORAGE_ERROR_PARTITION_NOT_FOUND, "No partition with label \"%s\", cannot proceed!",
                   NVS_PARTITION);
         } else {
             err = nvs_flash_init();
             if (err != ESP_OK) {
-                throw(STORAGE_ERROR_NVS_INIT_FAIL, "NVS init failed after retry, error: %s", esp_err_to_name(err));
+                throw(STORAGE_ERROR_GENERIC_FAILURE, "NVS init failed after retry, error: %s", esp_err_to_name(err));
             }
             VERBOSE("nvs_flash_init() retry successful");
         }
     }
     err = nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvsDefaultHandle);
     if (err == ESP_ERR_NVS_PART_NOT_FOUND) {
-        throw(STORAGE_ERROR_NVS_PARTITION_NOT_FOUND, "No partition with label \"%s\", cannot proceed!", NVS_PARTITION);
+        throw(STORAGE_ERROR_PARTITION_NOT_FOUND, "No partition with label \"%s\", cannot proceed!", NVS_PARTITION);
     } else if (err == ESP_ERR_NVS_NOT_INITIALIZED) {
-        throw(STORAGE_ERROR_NVS_INIT_FAIL, "NVS driver was not initialized");
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "NVS driver was not initialized");
     } else if (err != ESP_OK) {
         throw(STORAGE_ERROR_GENERIC_FAILURE, "nvs_open() returned error: %s", esp_err_to_name(err));
     }
