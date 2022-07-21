@@ -14,4 +14,31 @@ typedef enum StorageError {
     STORAGE_ERROR_GENERIC_FAILURE = -1,
 } StorageError;
 
+public inline const char *storageError_toString(const StorageError error) {
+    switch (error) {
+        case STORAGE_ERROR_NONE:
+            return "STORAGE_ERROR_NONE";
+        case STORAGE_ERROR_INVALID_PARAMETER:
+            return "STORAGE_ERROR_INVALID_PARAMETER";
+        case STORAGE_ERROR_PARTITION_NOT_FOUND:
+            return "STORAGE_ERROR_PARTITION_NOT_FOUND";
+        case STORAGE_ERROR_KEY_NOT_FOUND:
+            return "STORAGE_ERROR_KEY_NOT_FOUND";
+        case STORAGE_ERROR_INVALID_KEY:
+            return "STORAGE_ERROR_INVALID_KEY";
+        case STORAGE_ERROR_INVALID_VALUE:
+            return "STORAGE_ERROR_INVALID_VALUE";
+        case STORAGE_ERROR_NVS_CLOSED:
+            return "STORAGE_ERROR_NVS_CLOSED";
+        case STORAGE_ERROR_NOT_ENOUGH_SPACE:
+            return "STORAGE_ERROR_NOT_ENOUGH_SPACE";
+        case STORAGE_ERROR_FILE_NOT_FOUND:
+            return "STORAGE_ERROR_FILE_NOT_FOUND";
+        case STORAGE_ERROR_GENERIC_FAILURE:
+            return "STORAGE_ERROR_GENERIC_FAILURE";
+        default:
+            return "UNKNOWN ERROR";
+    }
+}
+
 #endif //ESP32_REMOTECAMERA_STORAGEERROR_H

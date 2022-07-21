@@ -9,7 +9,12 @@ set(EXTRA_COMPONENT_DIRS ../components/)
 # - when invoking CMake directly: cmake -D TEST_COMPONENTS="xxxxx" ..
 # - when using idf.py: idf.py -T xxxxx build
 #
-set(TEST_COMPONENTS common)
+set(TEST_COMPONENTS common storage)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(ESP32-RemoteCamera_test)
+
+add_custom_command(TARGET app
+        POST_BUILD
+        COMMAND npm run build
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/../webclient)

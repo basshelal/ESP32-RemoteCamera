@@ -4,7 +4,6 @@
 #include "Logger.h"
 #include <esp_err.h>
 #include <esp_spiffs.h>
-#include <unistd.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -133,7 +132,16 @@ public StorageError internalStorage_writeFile(const char *filePath,
 }
 
 public bool internalStorage_queryFileExists(const char *filePath) {
-    int err = access(filePath, F_OK);
+    if (filePath == NULL) {
+        throw(STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
+    }
+    char path[128];
+    int err = sprintf(path, "%s/%s", SPIFFS_PATH, filePath);
+    if (err < 0) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "sprintf() returned %i: %s", err, strerror(err));
+    }
+    struct stat statStruct;
+    err = stat(path, &statStruct);
     return err == 0;
 }
 

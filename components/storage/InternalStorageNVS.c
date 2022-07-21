@@ -10,6 +10,8 @@
 
 private nvs_handle_t nvsDefaultHandle;
 
+// TODO: 21-Jul-2022 @basshelal: Copy param checks and maybe errors from SPIFFS
+
 public StorageError nvs_init() {
     VERBOSE("Initializing NVS");
     esp_err_t err = nvs_flash_init();
@@ -78,7 +80,8 @@ public StorageError internalStorage_putString(const InternalStorageKey *key, con
     return STORAGE_ERROR_NONE;
 }
 
-public StorageError internalStorage_getString(const InternalStorageKey *key, char *valueIn) {
+public StorageError internalStorage_getString(const InternalStorageKey *key,
+                                              char *valueIn in_parameter) {
     size_t length = 0;
     esp_err_t err = nvs_get_str(nvsDefaultHandle, key, NULL, &length);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
@@ -96,7 +99,6 @@ public StorageError internalStorage_getString(const InternalStorageKey *key, cha
     } else if (err != ESP_OK) {
         throw(STORAGE_ERROR_GENERIC_FAILURE, "nvs_get_str() returned %s", esp_err_to_name(err));
     }
-    valueIn = malloc(sizeof(char) * length);
     err = nvs_get_str(nvsDefaultHandle, key, valueIn, &length);
     if (err == ESP_ERR_NVS_INVALID_LENGTH) {
         throw(STORAGE_ERROR_GENERIC_FAILURE,
