@@ -1,10 +1,5 @@
 # TODO
 
-## Internal Storage
-* Internal storage should get, put and delete key value pairs
-* Internal storage should get files (such as index.html)
-* Unit tests!
-
 ## WebClient
 * UI prototype with live video player (probably using hls)
 * Collapsible menu on the left side with all pages (using preact router),

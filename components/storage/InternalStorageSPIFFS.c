@@ -40,19 +40,13 @@ public StorageError spiffs_destroy() {
     return STORAGE_ERROR_NONE;
 }
 
-public StorageError internalStorage_readFile(const char *filePath,
-                                                 void *bufferIn in_parameter,
-                                                 const uint bufferLength,
-                                                 uint *bytesRead in_parameter) {
-    if (filePath == NULL) {
-        throw(STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
-    }
-    if (bytesRead == NULL) {
-        throw(STORAGE_ERROR_INVALID_PARAMETER, "bytesRead cannot be a NULL pointer");
-    }
-    if (bufferIn == NULL) {
-        throw(STORAGE_ERROR_INVALID_PARAMETER, "bufferIn cannot be a NULL pointer");
-    }
+public StorageError internalStorage_readFile(const char *filePath nonnull,
+                                             void *bufferIn,
+                                             const uint bufferLength,
+                                             uint *bytesRead in_parameter nonnull) {
+    requireNotNull(filePath, STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
+    requireNotNull(bufferIn, STORAGE_ERROR_INVALID_PARAMETER, "bufferIn cannot be a NULL pointer");
+    requireNotNull(bytesRead, STORAGE_ERROR_INVALID_PARAMETER, "bytesRead cannot be a NULL pointer");
 
     char path[128];
     int err = sprintf(path, "%s/%s", SPIFFS_PATH, filePath);
@@ -85,20 +79,13 @@ public StorageError internalStorage_readFile(const char *filePath,
     return STORAGE_ERROR_NONE;
 }
 
-public StorageError internalStorage_writeFile(const char *filePath,
-                                                  const void *buffer in_parameter,
-                                                  const uint bufferLength,
-                                                  uint *bytesWritten in_parameter) {
-
-    if (filePath == NULL) {
-        throw(STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
-    }
-    if (bytesWritten == NULL) {
-        throw(STORAGE_ERROR_INVALID_PARAMETER, "bytesWritten cannot be a NULL pointer");
-    }
-    if (buffer == NULL) {
-        throw(STORAGE_ERROR_INVALID_PARAMETER, "buffer cannot be a NULL pointer");
-    }
+public StorageError internalStorage_writeFile(const char *filePath nonnull,
+                                              const void *buffer in_parameter nonnull,
+                                              const uint bufferLength,
+                                              uint *bytesWritten in_parameter nonnull) {
+    requireNotNull(filePath, STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
+    requireNotNull(buffer, STORAGE_ERROR_INVALID_PARAMETER, "buffer cannot be a NULL pointer");
+    requireNotNull(bytesWritten, STORAGE_ERROR_INVALID_PARAMETER, "bytesWritten cannot be a NULL pointer");
 
     char path[128];
     int err = sprintf(path, "%s/%s", SPIFFS_PATH, filePath);
@@ -131,10 +118,8 @@ public StorageError internalStorage_writeFile(const char *filePath,
     return STORAGE_ERROR_NONE;
 }
 
-public bool internalStorage_queryFileExists(const char *filePath) {
-    if (filePath == NULL) {
-        throw(STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
-    }
+public bool internalStorage_queryFileExists(const char *filePath nonnull) {
+    requireNotNull(filePath, STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
     char path[128];
     int err = sprintf(path, "%s/%s", SPIFFS_PATH, filePath);
     if (err < 0) {
@@ -145,14 +130,10 @@ public bool internalStorage_queryFileExists(const char *filePath) {
     return err == 0;
 }
 
-public StorageError internalStorage_queryFileSize(const char *filePath,
-                                                      uint *fileSizeBytesIn in_parameter) {
-    if (filePath == NULL) {
-        throw(STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
-    }
-    if (fileSizeBytesIn == NULL) {
-        throw(STORAGE_ERROR_INVALID_PARAMETER, "fileSizeBytesIn cannot be a NULL pointer");
-    }
+public StorageError internalStorage_queryFileSize(const char *filePath nonnull,
+                                                  uint *fileSizeBytesIn in_parameter nonnull) {
+    requireNotNull(filePath, STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
+    requireNotNull(fileSizeBytesIn, STORAGE_ERROR_INVALID_PARAMETER, "fileSizeBytesIn cannot be a NULL pointer");
     char path[128];
     int err = sprintf(path, "%s/%s", SPIFFS_PATH, filePath);
     if (err < 0) {
@@ -168,10 +149,8 @@ public StorageError internalStorage_queryFileSize(const char *filePath,
     return STORAGE_ERROR_NONE;
 }
 
-public StorageError internalStorage_deleteFile(const char *filePath) {
-    if (filePath == NULL) {
-        throw(STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
-    }
+public StorageError internalStorage_deleteFile(const char *filePath nonnull) {
+    requireNotNull(filePath, STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
     char path[128];
     int err = sprintf(path, "%s/%s", SPIFFS_PATH, filePath);
     if (err < 0) {

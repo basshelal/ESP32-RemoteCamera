@@ -10,9 +10,9 @@
 ERROR(message, ##__VA_ARGS__);   \
 return error
 
-typedef unsigned char uchar;
-typedef unsigned short ushort;
-typedef unsigned int uint;
-typedef unsigned long ulong;
+#define requireNotNull(pointer, error, message, ...) \
+if (pointer == NULL) {                               \
+throw(error, message, ##__VA_ARGS__);                \
+}
 
 #endif //ESP32_REMOTECAMERA_INTERNALSTORAGECOMMON_H

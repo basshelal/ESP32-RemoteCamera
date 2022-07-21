@@ -8,6 +8,10 @@
 sprintf(buffer, format, ##__VA_ARGS__); \
 buffer;})
 
+#define XTEST_CASE(name, desc) \
+__attribute__((unused))        \
+static void UNITY_TEST_UID(disabled_test_func_) (void)
+
 #define BEFORE_EACH() void setUp(void)
 #define AFTER_EACH() void tearDown(void)
 

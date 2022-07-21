@@ -10,8 +10,6 @@
 
 private nvs_handle_t nvsDefaultHandle;
 
-// TODO: 21-Jul-2022 @basshelal: Copy param checks and maybe errors from SPIFFS
-
 public StorageError nvs_init() {
     VERBOSE("Initializing NVS");
     esp_err_t err = nvs_flash_init();
@@ -56,7 +54,9 @@ public StorageError nvs_destroy() {
     return STORAGE_ERROR_NONE;
 }
 
-public StorageError internalStorage_putString(const InternalStorageKey *key, const char *value) {
+public StorageError internalStorage_putString(const InternalStorageKey *key nonnull, const char *value nonnull) {
+    requireNotNull(key, STORAGE_ERROR_INVALID_PARAMETER, "key cannot be a NULL pointer");
+    requireNotNull(value, STORAGE_ERROR_INVALID_PARAMETER, "value cannot be a NULL pointer");
     esp_err_t err = nvs_set_str(nvsDefaultHandle, key, value);
     if (err == ESP_ERR_NVS_INVALID_HANDLE) {
         throw(STORAGE_ERROR_NVS_CLOSED, "NVS handled is closed");
@@ -80,8 +80,10 @@ public StorageError internalStorage_putString(const InternalStorageKey *key, con
     return STORAGE_ERROR_NONE;
 }
 
-public StorageError internalStorage_getString(const InternalStorageKey *key,
-                                              char *valueIn in_parameter) {
+public StorageError internalStorage_getString(const InternalStorageKey *key nonnull,
+                                              char *valueIn in_parameter nonnull) {
+    requireNotNull(key, STORAGE_ERROR_INVALID_PARAMETER, "key cannot be a NULL pointer");
+    requireNotNull(valueIn, STORAGE_ERROR_INVALID_PARAMETER, "valueIn cannot be a NULL pointer");
     size_t length = 0;
     esp_err_t err = nvs_get_str(nvsDefaultHandle, key, NULL, &length);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
@@ -110,7 +112,8 @@ public StorageError internalStorage_getString(const InternalStorageKey *key,
     return STORAGE_ERROR_NONE;
 }
 
-public StorageError internalStorage_deleteKey(const InternalStorageKey *key) {
+public StorageError internalStorage_deleteKey(const InternalStorageKey *key nonnull) {
+    requireNotNull(key, STORAGE_ERROR_INVALID_PARAMETER, "key cannot be a NULL pointer");
     esp_err_t err = nvs_erase_key(nvsDefaultHandle, key);
     if (err == ESP_ERR_NVS_INVALID_HANDLE) {
         throw(STORAGE_ERROR_NVS_CLOSED, "NVS handle is closed");
@@ -126,7 +129,8 @@ public StorageError internalStorage_deleteKey(const InternalStorageKey *key) {
     return STORAGE_ERROR_NONE;
 }
 
-public bool internalStorage_hasKey(const InternalStorageKey *key) {
+public bool internalStorage_hasKey(const InternalStorageKey *key nonnull) {
+    requireNotNull(key, STORAGE_ERROR_INVALID_PARAMETER, "key cannot be a NULL pointer");
     bool result = false;
     nvs_iterator_t it = nvs_entry_find(NVS_PARTITION, NVS_NAMESPACE, NVS_TYPE_ANY);
     nvs_entry_info_t info;
