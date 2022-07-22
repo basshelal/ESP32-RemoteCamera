@@ -6,5 +6,9 @@ export default merge(common, {
     mode: "development",
     optimization: {
         minimize: false,
-    }
+    },
+    devServer: {
+        historyApiFallback: true,
+        hot: true
+    },
 });

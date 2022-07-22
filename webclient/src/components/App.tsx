@@ -1,23 +1,45 @@
-import {createElement, FunctionComponent, RenderableProps} from "preact"
-import JSX = createElement.JSX
-import {useState} from "preact/compat"
+import {FunctionComponent, JSX} from "preact"
+import Router from "preact-router"
+import {Home} from "./pages/Home"
+import {Redirect} from "./Redirect"
+import {NotFound} from "./pages/NotFound"
+import {Header} from "./ui-elements/Header"
+import {Menu} from "./ui-elements/Menu"
+import {Files} from "./pages/Files"
+import {Settings} from "./pages/Settings"
+import {useLayoutEffect, useState} from "preact/compat"
+import {LogIn} from "./pages/LogIn"
 
 export interface AppProps {
-
 }
 
-export const App: FunctionComponent<AppProps> = (props: RenderableProps<AppProps>): JSX.Element => {
+export const App: FunctionComponent<AppProps> = (): JSX.Element => {
 
-    const [clicks, setClicks] = useState<number>(0)
+    const [isLoginPage, setIsLoginPage] = useState<boolean>(false)
 
-    const buttonOnClick = () => {
-        setClicks((prev) => prev + 1)
-    }
+    useLayoutEffect(() => {
+        if (document.URL.endsWith("/login")) {
+            setIsLoginPage(true)
+        } else {
+            setIsLoginPage(false)
+        }
+    }, [document.URL])
+
+    const Frame: FunctionComponent = (): JSX.Element | null => isLoginPage ? null :
+        (<>
+            <Header/>
+            <Menu/>
+        </>)
 
     return (<>
-        <p>Hello World from Preact!</p>
-
-        <button onClick={buttonOnClick}>Click me!</button>
-        <p>Button Clicks: {clicks}</p>
+        <Frame/>
+        <Router>
+            <LogIn path="/login"/>
+            <Home path="/home"/>
+            <Files path="/files"/>
+            <Settings path="/settings"/>
+            <Redirect path="/" to="/home"/>
+            <NotFound default/>
+        </Router>
     </>)
 }
