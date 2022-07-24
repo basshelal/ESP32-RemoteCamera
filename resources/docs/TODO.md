@@ -1,14 +1,7 @@
 # TODO
 
 ## WebClient
-* UI prototype with live video player (probably using hls)
-* Collapsible menu on the left side with all pages (using preact router),
-  these are:
-  * Live Feed (Home)
-  * File Browser (Browse SD card files)
-  * Settings
-* Top left and right should have time, battery, log out/account management, storage space left
-  Wi-Fi access point, IP address?, likely way less than this and only the bare essentials
+* Basic prototype with Preact + MaterializeCSS
 
 ## Battery
 * Clean component structure

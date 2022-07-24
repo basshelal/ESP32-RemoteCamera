@@ -1,4 +1,3 @@
-import CopyPlugin from "copy-webpack-plugin";
 import HtmlWebpackPlugin from "html-webpack-plugin";
 import path from "path";
 import {fileURLToPath} from "url";
@@ -35,9 +34,11 @@ export default {
         //     patterns: [{from: "./public/", to: "../webpages"}]
         // }),
         new HtmlWebpackPlugin({
-            title: "ESP32 Remote Camera",
+            template: "public/index.html",
             inject: "body",
             minify: "auto",
         }),
     ],
 };
+
+// TODO: Plugin to minify materialize.css and inline it into index.html and minify index.html

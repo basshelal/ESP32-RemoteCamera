@@ -1,6 +1,11 @@
-import {FunctionComponent, JSX} from "preact"
+import {Element, FC} from "../../Utils"
 
-export const Menu: FunctionComponent = (props): JSX.Element => {
+export const List: FC = (props): Element => {
+    return (<ul style={{}}>
+    </ul>)
+}
+
+export const Menu: FC = (props): Element => {
     return (<>
         <ul>
             <li>Home</li>

@@ -1,5 +1,5 @@
 import * as React from "preact"
-import {App} from "./components/App"
 import {render} from "preact"
+import {App} from "./components/App"
 
-render(<App />,document.body)
+render(<App/>, document.getElementById("main")!)

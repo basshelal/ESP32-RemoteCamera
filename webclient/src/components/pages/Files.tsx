@@ -1,10 +1,10 @@
-import {FunctionComponent, JSX} from "preact"
+import {FC, Element} from "../../Utils"
 
 export interface HomeProps {}
 
-export const Files: FunctionComponent<HomeProps> = (): JSX.Element => {
+export const Files: FC<HomeProps> = (): Element => {
 
-    return (<>
+    return (<main className="container">
         <h1>Files</h1>
-    </>)
+    </main>)
 }
