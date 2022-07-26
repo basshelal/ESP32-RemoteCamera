@@ -1,29 +1,26 @@
-import {Element, FC} from "../Utils"
-import Router from "preact-router"
+import {FC, JSXElement} from "../Utils"
 import {Home} from "./pages/Home"
-import {Redirect} from "./Redirect"
 import {NotFound} from "./pages/NotFound"
 import {Header} from "./ui-elements/Header"
-import {Menu} from "./ui-elements/Menu"
 import {Files} from "./pages/Files"
 import {Settings} from "./pages/Settings"
-import {useLayoutEffect, useState} from "preact/compat"
 import {LogIn} from "./pages/LogIn"
-import {DefaultTheme, Theme, ThemeContext, ThemeContextObject} from "./Theme"
+import {useLayoutEffect, useState} from "preact/hooks"
+import Router, {RouterOnChangeArgs} from "preact-router"
+import {Redirect} from "./Redirect"
+import {AppContext, AppContextObject, AppContextType, AppPage, DefaultContext} from "./AppContext"
 
-export interface AppProps {
-}
+export const App: FC = (): JSXElement => {
 
-export const App: FC<AppProps> = (): Element => {
-
-    const [theme, setTheme] = useState<Theme>(DefaultTheme)
+    let appPage: AppPage
+    const [appContext, setAppContext] = useState<AppContextType>(DefaultContext)
     const [isLoginPage, setIsLoginPage] = useState<boolean>(false)
 
-    const themeContextObject: ThemeContextObject = {
-        theme: theme,
-        update: function (newTheme: Partial<Theme>): void {
-            setTheme((oldTheme: Theme): Theme => {
-                return {...oldTheme, ...newTheme}
+    const appContextObject: AppContextObject = {
+        context: appContext,
+        update: function (newContext: Partial<AppContextType>): void {
+            setAppContext((oldContext: AppContextType): AppContextType => {
+                return {...oldContext, ...newContext}
             })
         }
     }
@@ -36,14 +33,31 @@ export const App: FC<AppProps> = (): Element => {
         }
     }, [document.URL])
 
-    const Frame: FC = (): Element | null => isLoginPage ? null :
-        (<>
-            <Header/>
-        </>)
+    const routerOnChange = (args: RouterOnChangeArgs): void => {
+        switch (args.path) {
+            case "/login":
+                appPage = "LogIn"
+                break
+            case "/home":
+                appPage = "Home"
+                break
+            case "/files":
+                appPage = "Files"
+                break
+            case "/settings":
+                appPage = "Settings"
+                break
+            default:
+                appPage = "NotFound"
+        }
+        setAppContext({appPage: appPage})
+    }
 
-    return (<ThemeContext.Provider value={themeContextObject}>
-        <Frame/>
-        <Router>
+    const Top: FC = (): JSXElement | null => isLoginPage ? null : (<Header/>)
+
+    return (<AppContext.Provider value={appContextObject}>
+        <Top/>
+        <Router onChange={routerOnChange}>
             <LogIn path="/login"/>
             <Home path="/home"/>
             <Files path="/files"/>
@@ -51,5 +65,5 @@ export const App: FC<AppProps> = (): Element => {
             <Redirect path="/" to="/home"/>
             <NotFound default/>
         </Router>
-    </ThemeContext.Provider>)
+    </AppContext.Provider>)
 }

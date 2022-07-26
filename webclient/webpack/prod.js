@@ -1,13 +1,23 @@
-import common from "./common.js";
-import {merge} from "webpack-merge";
-import HtmlInlineScriptPlugin from "html-inline-script-webpack-plugin";
+const common = require("./common")
+const merge = require("webpack-merge").merge
+const HtmlInlineScriptPlugin = require("html-inline-script-webpack-plugin")
+const HTMLInlineCSSWebpackPlugin = require("html-inline-css-webpack-plugin").default
 
-export default merge(common, {
+module.exports = merge(common, {
     mode: "production",
     optimization: {
         minimize: true
     },
     plugins: [
-        new HtmlInlineScriptPlugin()
+        new HtmlInlineScriptPlugin(),
+        new HTMLInlineCSSWebpackPlugin({
+            styleTagFactory({ style }) {
+                return `<style>${style}</style>`
+            },
+            replace: {
+                target: "<link rel=\"stylesheet\" href=\"pure.css\"/>",
+                removeTarget: true
+            }
+        }),
     ]
 });

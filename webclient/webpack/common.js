@@ -1,12 +1,11 @@
-import HtmlWebpackPlugin from "html-webpack-plugin";
-import path from "path";
-import {fileURLToPath} from "url";
+const HtmlWebpackPlugin = require("html-webpack-plugin")
+const path = require("path")
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const srcDir = path.join(__dirname, "..", "src");
 
-export default {
+module.exports = {
     entry: {
         main: path.join(srcDir, "Main.tsx"),
     },
@@ -18,27 +17,39 @@ export default {
     optimization: {
         minimize: false,
         usedExports: true,
+        minimizer : [
+            `...`,
+            new CssMinimizerPlugin(),
+        ]
     },
     module: {
-        rules: [{
-            test: /\.tsx?$/,
-            use: "ts-loader",
-            exclude: /node_modules/,
-        }],
+        rules: [
+            {
+                test: /\.tsx?$/,
+                use: "ts-loader",
+                exclude: /node_modules/,
+            },
+            {
+                test: /\.css$/,
+                use: [
+                    MiniCssExtractPlugin.loader,
+                    "css-loader"
+                ]
+            }
+        ],
     },
     resolve: {
         extensions: [".ts", ".tsx", ".js", ".jsx"],
     },
     plugins: [
-        // new CopyPlugin({
-        //     patterns: [{from: "./public/", to: "../webpages"}]
-        // }),
         new HtmlWebpackPlugin({
             template: "public/index.html",
             inject: "body",
             minify: "auto",
         }),
+        new MiniCssExtractPlugin({
+            filename: "[name].css",
+            chunkFilename: "[id].css"
+        }),
     ],
 };
-
-// TODO: Plugin to minify materialize.css and inline it into index.html and minify index.html

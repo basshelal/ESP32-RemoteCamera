@@ -1,10 +1,10 @@
-import {Element, FC} from "../../Utils"
+import {FC, JSXElement} from "../../Utils"
 
 export interface HomeProps {}
 
-export const Home: FC<HomeProps> = (): Element => {
+export const Home: FC<HomeProps> = (): JSXElement => {
 
-    return (<main class="container">
+    return (<main>
         <h1>Home</h1>
     </main>)
 }
