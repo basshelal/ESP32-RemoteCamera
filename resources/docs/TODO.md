@@ -56,3 +56,6 @@
 ## Hardware Packaging
 * Consider making hardware package semi-permanent to see how far we can go with authentic development
   experience as if we are presenting a prototype. This is also useful for archiving and documenting purposes.
+
+## Final Improvements
+* Consider investigating size reductions both for the C binary and webpage

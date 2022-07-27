@@ -1,8 +1,6 @@
 import {FC, JSXElement} from "../../Utils"
 
-export interface HomeProps {}
-
-export const Settings: FC<HomeProps> = (): JSXElement => {
+export const Settings: FC = (): JSXElement => {
 
     return (<main>
         <h1>Settings</h1>

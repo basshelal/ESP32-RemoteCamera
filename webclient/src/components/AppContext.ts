@@ -1,6 +1,6 @@
 import {Context, createContext} from "preact"
 
-export type AppPage = "Home" | "Files" | "Settings" | "LogIn"| "NotFound"
+export type AppPage = "Home" | "Files" | "Log" | "Settings" | "LogIn" | "NotFound"
 
 export interface AppContextType {
     appPage: AppPage

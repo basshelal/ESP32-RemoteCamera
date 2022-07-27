@@ -3,6 +3,7 @@ import {Home} from "./pages/Home"
 import {NotFound} from "./pages/NotFound"
 import {Header} from "./ui-elements/Header"
 import {Files} from "./pages/Files"
+import {Log} from "./pages/Log"
 import {Settings} from "./pages/Settings"
 import {LogIn} from "./pages/LogIn"
 import {useLayoutEffect, useState} from "preact/hooks"
@@ -44,6 +45,9 @@ export const App: FC = (): JSXElement => {
             case "/files":
                 appPage = "Files"
                 break
+            case "/log":
+                appPage = "Log"
+                break
             case "/settings":
                 appPage = "Settings"
                 break
@@ -61,6 +65,7 @@ export const App: FC = (): JSXElement => {
             <LogIn path="/login"/>
             <Home path="/home"/>
             <Files path="/files"/>
+            <Log path="/log"/>
             <Settings path="/settings"/>
             <Redirect path="/" to="/home"/>
             <NotFound default/>
