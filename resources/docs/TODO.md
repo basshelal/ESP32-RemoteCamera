@@ -1,7 +1,7 @@
 # TODO
 
 ## WebClient
-* Basic prototype with Preact + MaterializeCSS
+* Log file websocket
 
 ## Battery
 * Clean component structure

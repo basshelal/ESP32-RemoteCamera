@@ -24,6 +24,30 @@ export class Api {
         }
     }
 
+    public static async getLogLines(): Promise<Array<string>> {
+        return [`Initial Line 0`, `Initial Line 1`]
+
+        const url: string = this.api("log")
+        const response: Response = await fetch(url, {method: "GET"})
+        if (response.ok) {
+            const json: Array<string> = await response.json()
+            return json
+        } else {
+            throw new ApiError(url, response)
+        }
+    }
+
+    public static registerLinesEvent(root: HTMLElement): void {
+        let count = 0
+        setInterval(() => {
+            root.dispatchEvent(new CustomEvent("newLogLines", {
+                detail: {
+                    lines: [`Line: ${count++}`]
+                }
+            }))
+        }, 100)
+    }
+
     public static async postPassword(): Promise<void> {
         const url: string = this.api("password")
         const response: Response = await fetch(url, {method: "POST"})
