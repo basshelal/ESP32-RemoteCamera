@@ -17,4 +17,15 @@ typedef unsigned short ushort;
 typedef unsigned int uint;
 typedef unsigned long ulong;
 
+// Requires Logger.h
+#define throw(error, message, ...) \
+ERROR(message, ##__VA_ARGS__);   \
+return error
+
+// Requires Logger.h
+#define requireNotNull(pointer, error, message, ...) \
+if (pointer == NULL) {                               \
+throw(error, message, ##__VA_ARGS__);                \
+}
+
 #endif //ESP32_REMOTECAMERA_UTILS_H

@@ -1,5 +1,19 @@
 # TODO
 
+## Log
+* We should add an RGB LED capable of displaying multiple colors and effects to signal and detail
+  errors and progress such as WiFi connecting, failed, awaiting setup etc but only for more critical
+  and necessary signals, combining color, brightness, and effects (such as flashing with speed or even
+  patterns) means we can hardcode a (very) large number of signals, such a system could be used
+  on future projects as well
+
+## WiFi
+
+* WebServer calls WiFi to see if we can get an internet connection:
+  wifi responds, ok if we connect no problem, otherwise maybe no credentials exist on storage
+  thus tells webserver so and then webserver tells wifi to start in STA mode to begin the 
+  setup page server
+
 ## WebClient
 * Log file websocket
 

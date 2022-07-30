@@ -80,6 +80,9 @@ public StorageError internalStorage_putString(const InternalStorageKey *key nonn
     return STORAGE_ERROR_NONE;
 }
 
+// TODO: 31-Jul-2022 @basshelal: Need a function that gets string length before actually getting the string
+//  also allow valueIn to be NULL which means it gets allocated to fit, if passed in doesn't fit then
+//  put as much as possible and warn (or return error but still do the correct functionality)
 public StorageError internalStorage_getString(const InternalStorageKey *key nonnull,
                                               char *valueIn in_parameter nonnull) {
     requireNotNull(key, STORAGE_ERROR_INVALID_PARAMETER, "key cannot be a NULL pointer");

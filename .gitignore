@@ -4,3 +4,4 @@ build/
 
 # header file with passwords and API keys
 main/secrets.h
+components/wifi/secrets.h

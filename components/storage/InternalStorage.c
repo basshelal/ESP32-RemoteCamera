@@ -4,14 +4,20 @@
 #include "InternalStorageSPIFFS.h"
 #include "Logger.h"
 
+private bool hasInitialized = false;
 public StorageError internalStorage_init() {
-    VERBOSE("Initializing internal storage");
-    StorageError nvsError = nvs_init();
-    StorageError spiffsError = spiffs_init();
-    if (nvsError != STORAGE_ERROR_NONE || spiffsError != STORAGE_ERROR_NONE) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "Could not initialize internal storage");
+    if (!hasInitialized) {
+        VERBOSE("Initializing internal storage");
+        StorageError nvsError = nvs_init();
+        StorageError spiffsError = spiffs_init();
+        if (nvsError != STORAGE_ERROR_NONE || spiffsError != STORAGE_ERROR_NONE) {
+            throw(STORAGE_ERROR_GENERIC_FAILURE, "Could not initialize internal storage");
+        }
+        VERBOSE("Successfully initialized internal storage");
+        hasInitialized = true;
+    } else {
+        WARN("Internal storage has already initialized!");
     }
-    VERBOSE("Successfully initialized internal storage");
     return STORAGE_ERROR_NONE;
 }
 

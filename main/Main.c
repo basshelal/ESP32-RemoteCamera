@@ -1,7 +1,7 @@
 #include <esp_log.h>
 #include "Utils.h"
 #include "Logger.h"
-#include "services/WifiService.h"
+#include "Wifi.h"
 #include "services/WebServer.h"
 #include "services/DataStore.h"
 #include "services/Camera.h"
@@ -17,6 +17,7 @@ private void setup() {
     dataStore_init();
     camera_init();
     battery_init();
+    camera_read();
 }
 
 attr(__used__) attr(__noreturn__)

@@ -1,6 +1,7 @@
-#ifndef ESP32_REMOTECAMERA_WIFISERVICE_H
-#define ESP32_REMOTECAMERA_WIFISERVICE_H
+#ifndef ESP32_REMOTECAMERA_WIFI_H
+#define ESP32_REMOTECAMERA_WIFI_H
 
+#include "WifiError.h"
 #include "Utils.h"
 #include <esp_err.h>
 #include <esp_wifi_types.h>
@@ -21,22 +22,16 @@ typedef enum {
     DISCONNECTING,
 } WifiConnectionState;
 
-extern struct {
-    esp_err_t (*init)();
-    esp_err_t (*connect)(const WifiMode wifiMode);
-    WifiMode (*getCurrentMode)();
-    WifiConnectionState (*getCurrentConnectionState)();
-    esp_err_t (*disconnect)();
-} WifiService;
+extern WifiError wifi_init();
 
-extern esp_err_t wifi_init();
+extern WifiError wifi_destroy();
 
 extern esp_err_t wifi_connect(const WifiMode wifiMode);
 
-extern WifiMode wifi_getCurrentMode();
+extern WifiMode wifi_getMode();
 
-extern WifiConnectionState wifi_getCurrentConnectionState();
+extern WifiConnectionState wifi_getConnectionState();
 
 extern esp_err_t wifi_disconnect();
 
-#endif //ESP32_REMOTECAMERA_WIFISERVICE_H
+#endif //ESP32_REMOTECAMERA_WIFI_H

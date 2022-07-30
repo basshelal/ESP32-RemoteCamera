@@ -8,6 +8,9 @@
 
 typedef char InternalStorageKey;
 
+#define INTERNAL_STORAGE_KEY_WIFI_SSID "wifissid"
+#define INTERNAL_STORAGE_KEY_WIFI_PASSWORD "wifipassword"
+
 extern StorageError internalStorage_init();
 
 /** Destroys and de-initializes all internal structures,
