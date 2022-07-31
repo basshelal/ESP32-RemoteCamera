@@ -10,6 +10,7 @@ typedef char InternalStorageKey;
 
 #define INTERNAL_STORAGE_KEY_WIFI_SSID "wifissid"
 #define INTERNAL_STORAGE_KEY_WIFI_PASSWORD "wifipassword"
+#define INTERNAL_STORAGE_KEY_WIFI_IP_ADDRESS "wifiipaddress"
 
 extern StorageError internalStorage_init();
 
@@ -21,11 +22,16 @@ extern StorageError internalStorage_destroy();
  * you can check a key's existence using \c internalStorage_hasKey */
 extern StorageError internalStorage_putString(const InternalStorageKey *key, const char *value);
 
-/** Get the string at the key, valueIn will contain the result, pass in a NULL ptr and call free
- * when done with it as this is allocated in this function.
- * If no value is in key then valueIn is unchanged and \e STORAGE_ERROR_KEY_NOT_FOUND is returned*/
-extern StorageError internalStorage_getString(const InternalStorageKey *key,
-                                              char *valueIn nonnull in_parameter);
+extern StorageError internalStorage_getString(const InternalStorageKey *key nonnull,
+                                              char *valueIn in_parameter);
+
+extern StorageError internalStorage_getStringLength(const InternalStorageKey *key nonnull,
+                                                    size_t *lengthIn nonnull in_parameter);
+
+extern StorageError internalStorage_putUInt32(const InternalStorageKey *key, const uint32_t value);
+
+extern StorageError internalStorage_getUInt32(const InternalStorageKey *key nonnull,
+                                              uint32_t *valueIn in_parameter);
 
 /** Deletes the key (and its value), \e STORAGE_ERROR_KEY_NOT_FOUND is returned if key was not found */
 extern StorageError internalStorage_deleteKey(const InternalStorageKey *key nonnull);

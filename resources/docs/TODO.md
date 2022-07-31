@@ -13,6 +13,11 @@
   wifi responds, ok if we connect no problem, otherwise maybe no credentials exist on storage
   thus tells webserver so and then webserver tells wifi to start in STA mode to begin the 
   setup page server
+* The setup page may have to be in mixed mode, when on the page, scan for Wifi access points for
+  easier user experience, when connected we can check an internet connection to ensure all works
+  an internet connection is generally required or at least preferred, maybe also allow an option
+  for no internet, ie, remote camera that is connected to via its own network
+* Allow (advanced) users to choose and store their desired IP address
 
 ## WebClient
 * Log file websocket

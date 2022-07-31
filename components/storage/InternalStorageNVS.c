@@ -4,6 +4,7 @@
 #include "Logger.h"
 #include <esp_err.h>
 #include <nvs_flash.h>
+#include <string.h>
 
 #define NVS_PARTITION NVS_DEFAULT_PART_NAME
 #define NVS_NAMESPACE "default"
@@ -80,15 +81,33 @@ public StorageError internalStorage_putString(const InternalStorageKey *key nonn
     return STORAGE_ERROR_NONE;
 }
 
-// TODO: 31-Jul-2022 @basshelal: Need a function that gets string length before actually getting the string
-//  also allow valueIn to be NULL which means it gets allocated to fit, if passed in doesn't fit then
-//  put as much as possible and warn (or return error but still do the correct functionality)
-public StorageError internalStorage_getString(const InternalStorageKey *key nonnull,
-                                              char *valueIn in_parameter nonnull) {
+public StorageError internalStorage_getStringLength(const InternalStorageKey *key,
+                                                    size_t *lengthIn nonnull in_parameter) {
     requireNotNull(key, STORAGE_ERROR_INVALID_PARAMETER, "key cannot be a NULL pointer");
-    requireNotNull(valueIn, STORAGE_ERROR_INVALID_PARAMETER, "valueIn cannot be a NULL pointer");
-    size_t length = 0;
-    esp_err_t err = nvs_get_str(nvsDefaultHandle, key, NULL, &length);
+    requireNotNull(lengthIn, STORAGE_ERROR_INVALID_PARAMETER, "lengthIn cannot be a NULL pointer");
+    esp_err_t err = nvs_get_str(nvsDefaultHandle, key, NULL, lengthIn);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        throw(STORAGE_ERROR_KEY_NOT_FOUND, "Key %s does not exist", key);
+    } else if (err == ESP_ERR_NVS_INVALID_HANDLE) {
+        throw(STORAGE_ERROR_NVS_CLOSED, "NVS handle is closed");
+    } else if (err == ESP_ERR_NVS_INVALID_NAME) {
+        throw(STORAGE_ERROR_INVALID_KEY,
+              "Key: %s doesn't satisfy key name constraints, should be %i chars long (including terminator)",
+              key, NVS_KEY_NAME_MAX_SIZE);
+    } else if (err == ESP_ERR_NVS_INVALID_LENGTH) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE,
+              "Parameter `length` is not large enough to contain data, this should never happen");
+    } else if (err != ESP_OK) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "nvs_get_str() returned %s", esp_err_to_name(err));
+    }
+    return STORAGE_ERROR_NONE;
+}
+
+public StorageError internalStorage_getString(const InternalStorageKey *key nonnull,
+                                              char *valueIn in_parameter) {
+    requireNotNull(key, STORAGE_ERROR_INVALID_PARAMETER, "key cannot be a NULL pointer");
+    size_t requiredLength = 0;
+    esp_err_t err = nvs_get_str(nvsDefaultHandle, key, NULL, &requiredLength);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
         throw(STORAGE_ERROR_KEY_NOT_FOUND, "Key %s does not exist", key);
     } else if (err == ESP_ERR_NVS_INVALID_HANDLE) {
@@ -104,13 +123,64 @@ public StorageError internalStorage_getString(const InternalStorageKey *key nonn
     } else if (err != ESP_OK) {
         throw(STORAGE_ERROR_GENERIC_FAILURE, "nvs_get_str() returned %s", esp_err_to_name(err));
     }
-    err = nvs_get_str(nvsDefaultHandle, key, valueIn, &length);
+    size_t stringLength;
+    if (valueIn == NULL) { // allocate to fit
+        valueIn = malloc(requiredLength * sizeof(char));
+        stringLength = requiredLength;
+    } else {
+        stringLength = strlen(valueIn);
+    }
+    err = nvs_get_str(nvsDefaultHandle, key, valueIn, &stringLength);
     if (err == ESP_ERR_NVS_INVALID_LENGTH) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE,
-              "Parameter `length` is not large enough to contain data, this should have been handled by %s",
-              __PRETTY_FUNCTION__);
+        // TODO: 31-Jul-2022 @basshelal: Unit Test this condition
+        throw(STORAGE_ERROR_INVALID_LENGTH,
+              "String `valueIn` was not large enough to contain the result given size: %i, required size: %i",
+              stringLength, requiredLength);
     } else if (err != ESP_OK) {
         throw(STORAGE_ERROR_GENERIC_FAILURE, "nvs_get_str() returned %s", esp_err_to_name(err));
+    }
+    return STORAGE_ERROR_NONE;
+}
+
+public StorageError internalStorage_putUInt32(const InternalStorageKey *key, const uint32_t value) {
+    requireNotNull(key, STORAGE_ERROR_INVALID_PARAMETER, "key cannot be a NULL pointer");
+    esp_err_t err = nvs_set_u32(nvsDefaultHandle, key, value);
+    if (err == ESP_ERR_NVS_INVALID_HANDLE) {
+        throw(STORAGE_ERROR_NVS_CLOSED, "NVS handled is closed");
+    } else if (err == ESP_ERR_NVS_INVALID_NAME) {
+        throw(STORAGE_ERROR_INVALID_KEY,
+              "Key: %s doesn't satisfy key name constraints, should be %i chars long (including terminator)",
+              key, NVS_KEY_NAME_MAX_SIZE);
+    } else if (err == ESP_ERR_NVS_NOT_ENOUGH_SPACE) {
+        throw(STORAGE_ERROR_NOT_ENOUGH_SPACE, "Not enough space in NVS to save key: %s, value: %i",
+              key, value);
+    } else if (err != ESP_OK) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "nvs_set_i32() returned %s", esp_err_to_name(err));
+    }
+    err = nvs_commit(nvsDefaultHandle);
+    if (err != ESP_OK) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "nvs_commit() returned %s", esp_err_to_name(err));
+    }
+    return STORAGE_ERROR_NONE;
+}
+
+public StorageError internalStorage_getUInt32(const InternalStorageKey *key nonnull,
+                                              uint32_t *valueIn in_parameter) {
+    requireNotNull(key, STORAGE_ERROR_INVALID_PARAMETER, "key cannot be a NULL pointer");
+    esp_err_t err = nvs_get_u32(nvsDefaultHandle, key, valueIn);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        throw(STORAGE_ERROR_KEY_NOT_FOUND, "Key %s does not exist", key);
+    } else if (err == ESP_ERR_NVS_INVALID_HANDLE) {
+        throw(STORAGE_ERROR_NVS_CLOSED, "NVS handle is closed");
+    } else if (err == ESP_ERR_NVS_INVALID_NAME) {
+        throw(STORAGE_ERROR_INVALID_KEY,
+              "Key: %s doesn't satisfy key name constraints, should be %i chars long (including terminator)",
+              key, NVS_KEY_NAME_MAX_SIZE);
+    } else if (err == ESP_ERR_NVS_INVALID_LENGTH) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE,
+              "Parameter `length` is not large enough to contain data, this should never happen");
+    } else if (err != ESP_OK) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "nvs_get_i32() returned %s", esp_err_to_name(err));
     }
     return STORAGE_ERROR_NONE;
 }

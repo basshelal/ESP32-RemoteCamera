@@ -6,9 +6,7 @@ private struct {
     List *logFunctionsList;
 } logData;
 
-private inline esp_log_level_t
-
-logLevelToEspLogLevel(const LogLevel logLevel) {
+private inline esp_log_level_t logLevelToEspLogLevel(const LogLevel logLevel) {
     // currently they line up perfectly so no need to do anything
     return (esp_log_level_t) logLevel;
 }
@@ -31,7 +29,7 @@ public void log_removeLogFunction(const LogFunction logFunction) {
     list_removeItem(logData.logFunctionsList, logFunction);
 }
 
-public void log(const LogLevel logLevel, const char *tag, const char *format, const va_list vargs) {
+public void log_log(const LogLevel logLevel, const char *tag, const char *format, const va_list vargs) {
     private char string[1024];
     vsprintf(string, format, vargs);
     ESP_LOG_LEVEL(logLevelToEspLogLevel(logLevel), tag, "%s", string);
@@ -46,34 +44,34 @@ public void log(const LogLevel logLevel, const char *tag, const char *format, co
 public void logE(const char *tag, const char *format, ...) {
     va_list vargs;
     va_start(vargs, format);
-    log(ERROR, tag, format, vargs);
+    log_log(ERROR, tag, format, vargs);
     va_end(vargs);
 }
 
 public void logW(const char *tag, const char *format, ...) {
     va_list vargs;
     va_start(vargs, format);
-    log(WARN, tag, format, vargs);
+    log_log(WARN, tag, format, vargs);
     va_end(vargs);
 }
 
 public void logI(const char *tag, const char *format, ...) {
     va_list vargs;
     va_start(vargs, format);
-    log(INFO, tag, format, vargs);
+    log_log(INFO, tag, format, vargs);
     va_end(vargs);
 }
 
 public void logD(const char *tag, const char *format, ...) {
     va_list vargs;
     va_start(vargs, format);
-    log(DEBUG, tag, format, vargs);
+    log_log(DEBUG, tag, format, vargs);
     va_end(vargs);
 }
 
 public void logV(const char *tag, const char *format, ...) {
     va_list vargs;
     va_start(vargs, format);
-    log(VERBOSE, tag, format, vargs);
+    log_log(VERBOSE, tag, format, vargs);
     va_end(vargs);
 }

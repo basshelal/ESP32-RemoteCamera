@@ -102,6 +102,23 @@ private void wifi_eventHandlerSTAConnect(void *arg, esp_event_base_t event_base,
 private esp_err_t wifi_startSTA() {
     esp_err_t err;
     requireInitialized("Cannot start Wifi in STA mode");
+
+    StorageError storageError;
+    char wifiSSID[32];
+    char wifiPassword[64];
+    uint32_t ipAddress;
+    storageError = internalStorage_getString(INTERNAL_STORAGE_KEY_WIFI_SSID, wifiSSID);
+    storageError = internalStorage_getString(INTERNAL_STORAGE_KEY_WIFI_PASSWORD, wifiPassword);
+    storageError = internalStorage_getUInt32(INTERNAL_STORAGE_KEY_WIFI_IP_ADDRESS, &ipAddress);
+    // Decode uint32 into uint8 array for each entry in the IP address (192.168.0.255) each is a uint8
+    uint8_t ipAddressArray[4];
+    ipAddressArray[0] = (uint8_t) (ipAddress >> (32 - (8 * 1)));
+    ipAddressArray[1] = (uint8_t) (ipAddress >> (32 - (8 * 2)));
+    ipAddressArray[2] = (uint8_t) (ipAddress >> (32 - (8 * 3)));
+    ipAddressArray[3] = (uint8_t) (ipAddress >> (32 - (8 * 4)));
+    strcpy(wifiSSID, WIFI_SSID);
+    strcpy(wifiPassword, WIFI_PASSWORD);
+
     this.eventGroupSTA = xEventGroupCreate();
     if (this.eventGroupSTA == NULL) {
         throw(WIFI_ERROR_GENERIC_FAILURE, "xEventGroupCreate() returned NULL, FreeRTOS has no more memory to allocate");
@@ -118,7 +135,6 @@ private esp_err_t wifi_startSTA() {
     esp_netif_dhcpc_stop(espNetIf); // ignore errors
     esp_netif_ip_info_t ipInfo;
     IP4_ADDR(&ipInfo.ip, 192, 168, 0, 123); // device's IP address is 192.168.0.123
-    // TODO: 30-Jul-2022 @basshelal: Allow users to change the IP address in settings!
     IP4_ADDR(&ipInfo.gw, 192, 168, 0, 1);
     IP4_ADDR(&ipInfo.netmask, 255, 255, 255, 0);
     err = esp_netif_set_ip_info(espNetIf, &ipInfo);
@@ -126,8 +142,8 @@ private esp_err_t wifi_startSTA() {
         esp_netif_dhcpc_stop(espNetIf); // ignore errors
     }
 
-    wifi_init_config_t wifiConfig = WIFI_INIT_CONFIG_DEFAULT();
-    err = esp_wifi_init(&wifiConfig);
+    wifi_init_config_t wifiInitConfig = WIFI_INIT_CONFIG_DEFAULT();
+    err = esp_wifi_init(&wifiInitConfig);
     if (err != ESP_OK) {
         throw(WIFI_ERROR_GENERIC_FAILURE, "esp_wifi_init() returned %i : %s", err, esp_err_to_name(err));
     }
@@ -145,17 +161,17 @@ private esp_err_t wifi_startSTA() {
                                                         NULL,
                                                         &instance_got_ip));
 
-    wifi_config_t wifi_config = {
+    wifi_config_t wifiConfig = {
             .sta = {
-                    // TODO: 31-Jul-2022 @basshelal: Get wifi SSID and Password from internal storage
-                    .ssid = WIFI_SSID,
-                    .password = WIFI_PASSWORD,
                     .threshold.authmode = WIFI_AUTH_WPA2_PSK,
             },
     };
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    strcpy((char *) wifiConfig.sta.ssid, wifiSSID);
+    strcpy((char *) wifiConfig.sta.password, wifiPassword);
+
+    err = esp_wifi_set_mode(WIFI_MODE_STA);
+    err = esp_wifi_set_config(WIFI_IF_STA, &wifiConfig);
+    err = esp_wifi_start();
 
     this.connectionState = CONNECTING;
     LOGI("Finished Wifi initialization, waiting to connect...");

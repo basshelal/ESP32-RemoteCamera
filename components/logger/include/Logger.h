@@ -18,7 +18,7 @@ extern void log_addLogFunction(const LogFunction logFunction);
 
 extern void log_removeLogFunction(const LogFunction logFunction);
 
-extern void log(const LogLevel logLevel, const char *tag, const char *format, const va_list vargs);
+extern void log_log(const LogLevel logLevel, const char *tag, const char *format, const va_list vargs);
 
 __log_function__
 extern void logE(const char *tag, const char *format, ...);
@@ -38,9 +38,9 @@ extern void logV(const char *tag, const char *format, ...);
 #undef __log_function__
 
 #ifdef LOG_TAG
-#define LOG_TEMPLATE(s, ...) LOG_TAG, "%s %d"s, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
+#define LOG_TEMPLATE(s, ...) LOG_TAG, "%s:%d "s, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
 #else
-#define LOG_TEMPLATE(s, ...) __FILE__, "%s %d"s, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
+#define LOG_TEMPLATE(s, ...) __FILE__, "%s:%d "s, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
 #endif
 
 #define ERROR(message, ...) logE(LOG_TEMPLATE(message, ##__VA_ARGS__))
