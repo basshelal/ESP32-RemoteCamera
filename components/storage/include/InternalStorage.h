@@ -3,6 +3,7 @@
 
 #include "Utils.h"
 #include "StorageError.h"
+#include "FileMode.h"
 #include <stdio.h>
 #include <stdbool.h>
 
@@ -41,7 +42,8 @@ extern StorageError internalStorage_deleteKey(const InternalStorageKey *key nonn
 extern bool internalStorage_hasKey(const InternalStorageKey *key nonnull);
 
 extern StorageError internalStorage_openFile(const char *filePath nonnull,
-                                             FILE **fileIn in_parameter);
+                                             FILE **fileIn in_parameter,
+                                             const FileMode fileMode);
 
 extern StorageError internalStorage_closeFile(const FILE *fileIn nonnull);
 

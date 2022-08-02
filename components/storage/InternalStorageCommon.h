@@ -3,7 +3,7 @@
 
 #include "Utils.h"
 
-#define LOG_TAG "InternalStorage:"__FILE__
+//#define LOG_TAG "InternalStorage:"__FILENAME__
 #define undeclared static
 
 #endif //ESP32_REMOTECAMERA_INTERNALSTORAGECOMMON_H

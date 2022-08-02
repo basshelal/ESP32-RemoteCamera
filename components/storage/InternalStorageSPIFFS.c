@@ -41,7 +41,8 @@ public StorageError spiffs_destroy() {
 }
 
 public StorageError internalStorage_openFile(const char *filePath nonnull,
-                                             FILE **fileIn in_parameter) {
+                                             FILE **fileIn in_parameter,
+                                             const FileMode fileMode) {
     requireNotNull(filePath, STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
 
     char path[128];
@@ -50,7 +51,7 @@ public StorageError internalStorage_openFile(const char *filePath nonnull,
         throw(STORAGE_ERROR_GENERIC_FAILURE, "sprintf() returned %i: %s", err, strerror(err));
     }
 
-    *fileIn = fopen(path, "w");
+    *fileIn = fopen(path, fileModeToString(fileMode));
     if (*fileIn == NULL) {
         err = errno;
         if (err == ENOENT) {
@@ -85,7 +86,9 @@ public StorageError internalStorage_readFileChunks(const FILE *file nonnull,
     int err;
     if (startPosition != INTERNAL_STORAGE_POSITION_CONTINUE) {
         err = fsetpos(file, (fpos_t *) &startPosition);
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "fsetpos() returned error %i: %s", err, strerror(err));
+        if (err != 0) {
+            throw(STORAGE_ERROR_GENERIC_FAILURE, "fsetpos() returned error %i: %s", err, strerror(err));
+        }
     }
     *bytesRead = fread(bufferIn, sizeof(char), bufferLength, file);
     if (ferror(file)) {
