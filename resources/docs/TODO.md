@@ -10,6 +10,11 @@
 ## WiFi
 
 * WebServer calls WiFi to see if we can get an internet connection:
+  Wifi checks if we have credentials stored to connect with: 
+     true then try to connect with them until success or fail
+     false (or after enough retries) then connect into setup-mode where ESP32 is a
+         Wifi access point (and also station) where you can visit the page to view
+         logs and set-up connection to diagnose issues
   wifi responds, ok if we connect no problem, otherwise maybe no credentials exist on storage
   thus tells webserver so and then webserver tells wifi to start in STA mode to begin the 
   setup page server

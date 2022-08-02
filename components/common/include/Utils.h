@@ -23,11 +23,13 @@ typedef unsigned long ulong;
 ERROR(message, ##__VA_ARGS__);   \
 return error
 
-// Requires Logger.h
-#define requireNotNull(pointer, error, message, ...) \
+#define require(condition, error, message, ...) \
 do{                                                  \
-if (pointer == NULL) {                               \
+if (!(condition)) {                                  \
 throw(error, message, ##__VA_ARGS__);                \
 }}while(0)
+
+// Requires Logger.h
+#define requireNotNull(pointer, error, message, ...) require(pointer != NULL, error, message, ##__VA_ARGS__)
 
 #endif //ESP32_REMOTECAMERA_UTILS_H
