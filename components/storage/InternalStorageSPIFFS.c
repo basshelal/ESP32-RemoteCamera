@@ -40,6 +40,62 @@ public StorageError spiffs_destroy() {
     return STORAGE_ERROR_NONE;
 }
 
+public StorageError internalStorage_openFile(const char *filePath nonnull,
+                                             FILE **fileIn in_parameter) {
+    requireNotNull(filePath, STORAGE_ERROR_INVALID_PARAMETER, "filePath cannot be a NULL pointer");
+
+    char path[128];
+    int err = sprintf(path, "%s/%s", SPIFFS_PATH, filePath);
+    if (err < 0) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "sprintf() returned %i: %s", err, strerror(err));
+    }
+
+    *fileIn = fopen(path, "w");
+    if (*fileIn == NULL) {
+        err = errno;
+        if (err == ENOENT) {
+            throw(STORAGE_ERROR_FILE_NOT_FOUND,
+                  "fopen() returned ENOENT, file in path: %s was likely not found", path);
+        } else {
+            throw(STORAGE_ERROR_GENERIC_FAILURE, "fopen() returned error %i: %s", err, strerror(err));
+        }
+    }
+    return STORAGE_ERROR_NONE;
+}
+
+public StorageError internalStorage_closeFile(const FILE *file nonnull) {
+    requireNotNull(file, STORAGE_ERROR_INVALID_PARAMETER, "file cannot be a NULL pointer");
+
+    int err = fclose(file);
+    if (err != 0) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "fclose() returned error %i: %s", err, strerror(err));
+    }
+    return STORAGE_ERROR_NONE;
+}
+
+public StorageError internalStorage_readFileChunks(const FILE *file nonnull,
+                                                   size_t startPosition,
+                                                   void *bufferIn,
+                                                   const uint bufferLength,
+                                                   uint *bytesRead in_parameter nonnull) {
+    requireNotNull(file, STORAGE_ERROR_INVALID_PARAMETER, "file cannot be a NULL pointer");
+    requireNotNull(bufferIn, STORAGE_ERROR_INVALID_PARAMETER, "bufferIn cannot be a NULL pointer");
+    requireNotNull(bytesRead, STORAGE_ERROR_INVALID_PARAMETER, "bytesRead cannot be a NULL pointer");
+
+    int err;
+    if (startPosition != INTERNAL_STORAGE_POSITION_CONTINUE) {
+        err = fsetpos(file, (fpos_t *) &startPosition);
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "fsetpos() returned error %i: %s", err, strerror(err));
+    }
+    *bytesRead = fread(bufferIn, sizeof(char), bufferLength, file);
+    if (ferror(file)) {
+        err = errno;
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "fread() returned error %i: %s", err, strerror(err));
+    }
+
+    return STORAGE_ERROR_NONE;
+}
+
 public StorageError internalStorage_readFile(const char *filePath nonnull,
                                              void *bufferIn,
                                              const uint bufferLength,

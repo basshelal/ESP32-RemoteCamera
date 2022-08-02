@@ -26,7 +26,7 @@ extern WifiError wifi_init();
 
 extern WifiError wifi_destroy();
 
-extern esp_err_t wifi_connect(const WifiMode wifiMode);
+extern WifiError wifi_connect(const WifiMode wifiMode);
 
 extern WifiMode wifi_getMode();
 

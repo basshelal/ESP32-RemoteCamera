@@ -2,7 +2,7 @@
 #include "Utils.h"
 #include "Logger.h"
 #include "Wifi.h"
-#include "services/WebServer.h"
+#include "Webserver.h"
 #include "services/DataStore.h"
 #include "services/Camera.h"
 #include "freertos/FreeRTOS.h"
@@ -13,7 +13,7 @@ private void setup() {
     log_init();
     wifi_init();
     wifi_connect(WIFI_MODE_STA);
-    webServer_init();
+    webserver_init();
     dataStore_init();
     camera_init();
     battery_init();

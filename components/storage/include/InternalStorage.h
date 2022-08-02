@@ -12,6 +12,8 @@ typedef char InternalStorageKey;
 #define INTERNAL_STORAGE_KEY_WIFI_PASSWORD "wifipassword"
 #define INTERNAL_STORAGE_KEY_WIFI_IP_ADDRESS "wifiipaddress"
 
+#define INTERNAL_STORAGE_POSITION_CONTINUE UINT32_MAX
+
 extern StorageError internalStorage_init();
 
 /** Destroys and de-initializes all internal structures,
@@ -37,6 +39,17 @@ extern StorageError internalStorage_getUInt32(const InternalStorageKey *key nonn
 extern StorageError internalStorage_deleteKey(const InternalStorageKey *key nonnull);
 
 extern bool internalStorage_hasKey(const InternalStorageKey *key nonnull);
+
+extern StorageError internalStorage_openFile(const char *filePath nonnull,
+                                             FILE **fileIn in_parameter);
+
+extern StorageError internalStorage_closeFile(const FILE *fileIn nonnull);
+
+extern StorageError internalStorage_readFileChunks(const FILE *file nonnull,
+                                                   size_t startPosition,
+                                                   void *bufferIn,
+                                                   const uint bufferLength,
+                                                   uint *bytesRead in_parameter nonnull);
 
 extern StorageError internalStorage_readFile(const char *filePath nonnull,
                                              void *bufferIn nonnull in_parameter,
