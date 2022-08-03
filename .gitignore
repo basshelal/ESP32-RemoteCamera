@@ -1,6 +1,7 @@
 cmake-build*/
 .idea/
 build/
+webpages/*
 
 # header file with passwords and API keys
 main/secrets.h

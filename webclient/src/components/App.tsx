@@ -13,7 +13,6 @@ import {AppContext, AppContextObject, AppContextType, AppPage, DefaultContext} f
 
 export const App: FC = (): JSXElement => {
 
-    let appPage: AppPage
     const [appContext, setAppContext] = useState<AppContextType>(DefaultContext)
     const [isLoginPage, setIsLoginPage] = useState<boolean>(false)
 
@@ -35,26 +34,12 @@ export const App: FC = (): JSXElement => {
     }, [document.URL])
 
     const routerOnChange = (args: RouterOnChangeArgs): void => {
-        switch (args.path) {
-            case "/login":
-                appPage = "LogIn"
-                break
-            case "/home":
-                appPage = "Home"
-                break
-            case "/files":
-                appPage = "Files"
-                break
-            case "/log":
-                appPage = "Log"
-                break
-            case "/settings":
-                appPage = "Settings"
-                break
-            default:
-                appPage = "NotFound"
+        if (!!args.path) {
+            const page: AppPage | undefined = AppPage.fromPath(args.path)
+            if (!!page) {
+                setAppContext({appPage: page})
+            }
         }
-        setAppContext({appPage: appPage})
     }
 
     const Top: FC = (): JSXElement | null => isLoginPage ? null : (<Header/>)
@@ -62,12 +47,13 @@ export const App: FC = (): JSXElement => {
     return (<AppContext.Provider value={appContextObject}>
         <Top/>
         <Router onChange={routerOnChange}>
-            <LogIn path="/login"/>
-            <Home path="/home"/>
-            <Files path="/files"/>
-            <Log path="/log"/>
-            <Settings path="/settings"/>
-            <Redirect path="/" to="/home"/>
+            <LogIn path={AppPage.LOGIN.path}/>
+            <Home path={AppPage.HOME.path}/>
+            <Files path={AppPage.FILES.path}/>
+            <Log path={AppPage.LOG.path}/>
+            <Settings path={AppPage.SETTINGS.path}/>
+            <Redirect path="/" to={AppPage.HOME.path}/>
+            <Redirect path={AppPage.pagePrefix} to={AppPage.HOME.path}/>
             <NotFound default/>
         </Router>
     </AppContext.Provider>)

@@ -15,7 +15,7 @@ module.exports = {
     output: {
         path: destinationDir,
         filename: "[name].js",
-        publicPath: ""
+        publicPath: "/"
     },
     optimization: {
         minimize: false,

@@ -17,4 +17,4 @@ add_custom_command(TARGET app
 add_custom_command(TARGET app
         POST_BUILD
         COMMAND ./sizes.sh
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/scripts)

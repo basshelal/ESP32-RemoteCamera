@@ -14,10 +14,11 @@ private void *favIconFileBuffer;
 
 private esp_err_t webserver_emptyHandler(httpd_req_t *request) {
     INFO("URI: %s", request->uri);
+    httpd_resp_send_404(request);
     return ESP_OK;
 }
 
-private esp_err_t webserver_getHandler(httpd_req_t *request) {
+private esp_err_t webserver_pageHandler(httpd_req_t *request) {
     INFO("URI: %s", request->uri);
     httpd_resp_set_status(request, HTTPD_200);
     const bool exists = internalStorage_queryFileExists("index.html");
@@ -106,21 +107,24 @@ public WebserverError webserver_init() {
         return ESP_FAIL;
     }
 
-    httpd_uri_t favIconHandler = {.uri= "/favicon.*", .method= HTTP_GET, .handler= webserver_getFavIcon, .user_ctx=NULL};
+    httpd_uri_t favIconHandler = {.uri= "/pages/favicon.*", .method= HTTP_GET, .handler= webserver_getFavIcon};
     httpd_register_uri_handler(server, &favIconHandler);
 
-    httpd_uri_t blobDownload = {.uri= "/blob*", .method= HTTP_GET, .handler= webserver_emptyHandler, .user_ctx= NULL};
-    httpd_register_uri_handler(server, &blobDownload);
+    httpd_uri_t blobHandler = {.uri= "/pages/blob*", .method= HTTP_GET, .handler= webserver_emptyHandler};
+    httpd_register_uri_handler(server, &blobHandler);
 
-    httpd_uri_t file_download = {.uri= "/*", .method= HTTP_GET, .handler= webserver_getHandler, .user_ctx= NULL};
-    httpd_register_uri_handler(server, &file_download);
+    httpd_uri_t webPageHandler = {.uri= "/pages*", .method= HTTP_GET, .handler= webserver_pageHandler};
+    httpd_register_uri_handler(server, &webPageHandler);
+
+    httpd_uri_t rootHandler = {.uri= "/", .method= HTTP_GET, .handler= webserver_pageHandler};
+    httpd_register_uri_handler(server, &rootHandler);
 
     INFO("Web Server started!");
 
     internalStorage_init();
 
-    fileBuffer = malloc(FILE_BUFFER_SIZE);
-    favIconFileBuffer = malloc(FILE_BUFFER_SIZE);
+    fileBuffer = alloc(FILE_BUFFER_SIZE);
+    favIconFileBuffer = alloc(FILE_BUFFER_SIZE);
 
     return ESP_OK;
 }

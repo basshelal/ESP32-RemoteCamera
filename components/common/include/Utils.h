@@ -18,6 +18,8 @@ typedef unsigned short ushort;
 typedef unsigned int uint;
 typedef unsigned long ulong;
 
+#define alloc(size) calloc(size, sizeof(char))
+
 // Requires Logger.h
 #define throw(error, message, ...) \
 ERROR(message, ##__VA_ARGS__);   \

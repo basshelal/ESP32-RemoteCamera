@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "description": "Client for ESP32 Remote Camera",
   "scripts": {
-    "build": "npm run clean && webpack --config=webpack/prod.js && ../sizes.sh",
+    "build": "npm run clean && webpack --config=webpack/prod.js && ../scripts/sizes.sh",
     "clean": "rimraf ../webpages/*",
     "dev": "webpack serve --config=webpack/dev.js",
     "test": "jest"

@@ -82,4 +82,6 @@
   experience as if we are presenting a prototype. This is also useful for archiving and documenting purposes.
 
 ## Final Improvements
-* Consider investigating size reductions both for the C binary and webpage
+* Size reductions
+  * Try to reduce HLS.js by making it tree-shakeable if possible, this is the easiest way to have 
+    a large effect without having to understand the inner implementation
