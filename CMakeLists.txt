@@ -6,7 +6,7 @@ set(EXTRA_COMPONENT_DIRS components/)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(ESP32-RemoteCamera)
 
-set(MY_COMPILE_OPTIONS -Wno-unused-function)
+set(MY_COMPILE_OPTIONS -Wno-unused-function -Wno-discarded-qualifiers -Wno-unused-variable -Wno-unused-but-set-variable)
 idf_build_set_property(COMPILE_OPTIONS "${MY_COMPILE_OPTIONS}" APPEND)
 
 add_custom_command(TARGET app

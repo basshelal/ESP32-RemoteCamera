@@ -1,4 +1,3 @@
-#include <esp_log.h>
 #include "Utils.h"
 #include "Logger.h"
 #include "Wifi.h"
@@ -24,7 +23,7 @@ attr(__used__) attr(__noreturn__)
 public void app_main() {
     setup();
     while (true) {
-        logI("Battery", "%s", battery_text());
+        INFO("%s", battery_text());
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

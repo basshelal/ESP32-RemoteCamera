@@ -1,52 +1,54 @@
-#include <memory.h>
-#include "List.h"
 #include "unity.h"
+#include "List.h"
 #include "TestUtils.h"
+#include "esp_heap_caps.h"
 
-// TODO: 09-Jul-2022 @basshelal: Cleaner smaller tests, use macro helpers if needed
+#define TEST_TAG "[List]"
+#define TEST(name) TEST_CASE(name, TEST_TAG)
+#define XTEST(name) XTEST_CASE(name, TEST_TAG)
 
-#define TAG "[List]"
+#define listCapacity(list) *((capacity_t *) list)
 
-int myInt = 69;
+int myTestItems[10] = {1, 2, 4, 8, 16, 32, 64, 128, 256, 512};
 
-TEST_CASE("Create List", TAG) {
+TEST("List create") {
     List *list = list_create();
-    ASSERT_NOT_NULL(list, "List should be non-null");
+    ASSERT_NOT_NULL(list, "List should not be null");
     list_destroy(list);
 }
 
-TEST_CASE("Create List with Options Capacity and isGrowable", TAG) {
+TEST("List create with options capacity and isGrowable") {
     ListOptions listOptions = {
             .capacity = 1,
             .isGrowable = false,
             .growthFactor = 1,
             .errorCallback = NULL
     };
-    List *list = list_createOptions(&listOptions);
-    ASSERT_NOT_NULL(list, "List should be non-null");
+    List *list = list_createWithOptions(&listOptions);
+    ASSERT_NOT_NULL(list, "List should not be null");
 
-    list_addItem(list, &myInt);
-    list_addItem(list, &myInt);
-    list_addItem(list, &myInt);
+    list_addItem(list, &myTestItems[0]);
+    list_addItem(list, &myTestItems[1]);
+    list_addItem(list, &myTestItems[2]);
 
-    ASSERT_INT_EQUAL(listOptions.capacity, list_size(list), "List size should not be larger than it's capacity");
+    ASSERT_UINT_EQUAL(listOptions.capacity, list_getSize(list), "List size should not be larger than its capacity");
     list_destroy(list);
 }
 
-TEST_CASE("Create List with Options growth factor", TAG) {
+TEST("List create with options growthFactor") {
     ListOptions listOptions = {
             .capacity = 1,
             .isGrowable = true,
             .growthFactor = 2,
             .errorCallback = NULL
     };
-    List *list = list_createOptions(&listOptions);
-    ASSERT_NOT_NULL(list, "List should be non-null");
+    List *list = list_createWithOptions(&listOptions);
+    ASSERT_NOT_NULL(list, "List should not be null");
 
-    list_addItem(list, &myInt);
-    list_addItem(list, &myInt);
+    list_addItem(list, &myTestItems[0]);
+    list_addItem(list, &myTestItems[1]);
 
-    ASSERT_INT_EQUAL(2, list_size(list), "List size should be 2");
+    ASSERT_UINT_EQUAL(2, list_getSize(list), "List size should be 2");
     list_destroy(list);
 }
 
@@ -56,133 +58,212 @@ void error_callback(const ListError listError) {
     callbackCalled++;
 }
 
-TEST_CASE("Create List with Options error callback", TAG) {
+TEST("List create with options errorCallback") {
     ListOptions listOptions = {
             .capacity = 1,
             .isGrowable = false,
-            .growthFactor = 2,
+            .growthFactor = 1,
             .errorCallback = error_callback
     };
-    List *list = list_createOptions(&listOptions);
-    ASSERT_NOT_NULL(list, "List should be non-null");
+    List *list = list_createWithOptions(&listOptions);
+    ASSERT_NOT_NULL(list, "List should not be null");
 
-    list_addItem(list, &myInt);
-    list_addItem(list, &myInt);
+    list_addItem(list, &myTestItems[0]);
+    list_addItem(list, &myTestItems[1]);
 
-    ASSERT_INT_GREATER_THAN(0, callbackCalled, "Error callback should have been called");
+    ASSERT_INT_EQUAL(1, callbackCalled, "Error callback should have been called exactly once");
     list_destroy(list);
     callbackCalled = 0;
 }
 
-TEST_CASE("List Size", TAG) {
-    ASSERT_INT_EQUAL(-1, list_size(NULL), "Null list size should be -1");
+TEST("List Size") {
+    ASSERT_UINT_EQUAL(LIST_INVALID_INDEX_CAPACITY, list_getSize(NULL), "Null list size should be invalid");
 
     List *list = list_create();
+    ASSERT_UINT_EQUAL(0, list_getSize(list), "List size should be 0");
 
-    const int mySize = 100;
-    for (int i = 0; i < mySize; i++) {
-        list_addItem(list, &myInt);
+    const unsigned int size = 256;
+    char testItems[size];
+    for (int i = 0; i < size; i++) {
+        testItems[i] = (char) i;
+    }
+    for (int i = 0; i < size; i++) {
+        list_addItem(list, &testItems[i]);
     }
 
-    ASSERT_INT_EQUAL(mySize, list_size(list), "List size was incorrect");
+    ASSERT_UINT_EQUAL(size, list_getSize(list), "List size was incorrect");
+    list_clear(list);
+    ASSERT_UINT_EQUAL(0, list_getSize(list), "List size should be 0");
 
     list_destroy(list);
 }
 
-TEST_CASE("List isEmpty", TAG) {
-    ASSERT_INT_EQUAL(true, list_isEmpty(NULL), "Null List isEmpty should be true");
+TEST("List isEmpty") {
+    ASSERT(list_isEmpty(NULL), "Null List isEmpty should be true");
 
     List *list = list_create();
+    ASSERT(list_isEmpty(list), "List isEmpty should be true");
 
-    ASSERT_INT_EQUAL(true, list_isEmpty(list), "List isEmpty should be true");
+    const unsigned int size = 256;
+    char testItems[size];
+    for (int i = 0; i < size; i++) {
+        testItems[i] = (char) i;
+    }
+    for (int i = 0; i < size; i++) {
+        list_addItem(list, &testItems[i]);
+    }
 
-    list_addItem(list, &myInt);
+    ASSERT_FALSE(list_isEmpty(list), "List isEmpty should be false");
 
-    ASSERT_INT_EQUAL(false, list_isEmpty(list), "List isEmpty should be false");
+    list_clear(list);
+    ASSERT(list_isEmpty(list), "List isEmpty should be true");
 
     list_destroy(list);
 }
 
-TEST_CASE("List get item", TAG) {
+TEST("List addItem") {
     List *list = list_create();
 
-    list_addItem(list, &myInt);
+    char myString[16];
+    sprintf(myString, "This is a test");
+    bool myBool = false;
+
+    list_addItem(list, &myTestItems[0]);
+    list_addItem(list, NULL);
+    list_addItem(list, myString);
+    list_addItem(list, &myBool);
+
+    ASSERT_INT_EQUAL(myTestItems[0], *((int *) list_getItem(list, 0)), "item at index 0 was incorrect");
+    ASSERT_NULL(list_getItem(list, 1), "item at index 1 should be NULL");
+    ASSERT_STRING_EQUAL(myString, list_getItem(list, 2), "strings were not equal");
+    ASSERT_FALSE(*((bool *) list_getItem(list, 3)), "item at index 3 should be false");
+
+    list_destroy(list);
+}
+
+TEST("List addItemIndexed") {
+// TODO: 05-Aug-2022 @basshelal: AddItem including NULL and differing types and sizes, in end or beginning or middle
+}
+
+TEST("List getItem") {
+    List *list = list_create();
+
+    const unsigned int size = 256;
+    char testItems[size];
+    for (int i = 0; i < size; i++) {
+        testItems[i] = (char) i;
+    }
+    for (int i = 0; i < size; i++) {
+        list_addItem(list, &testItems[i]);
+    }
+    ASSERT_UINT_EQUAL(size, list_getSize(list), "List size was incorrect");
+
+    for (int i = 0; i < size; i++) {
+        ListItem *result = list_getItem(list, i);
+        ASSERT_NOT_NULL(result, "Result should not be null");
+        ASSERT_INT_EQUAL(testItems[i], *((char *) result), "List getItem returned incorrect item");
+    }
+
+    list_destroy(list);
+}
+
+TEST("List growth") {
+    ListOptions listOptions = LIST_DEFAULT_OPTIONS;
+    listOptions.capacity = 2;
+    listOptions.isGrowable = true;
+    listOptions.growthFactor = 2;
+    List *list = list_createWithOptions(&listOptions);
+
+    // reflection-like access based on known ListData internals
+    capacity_t capacity = listCapacity(list);
+    ASSERT_UINT_EQUAL(listOptions.capacity, capacity, "Capacity was incorrect");
+
+    list_addItem(list, &myTestItems[0]);
+    list_addItem(list, &myTestItems[1]);
+
+    ASSERT_UINT_EQUAL(2, list_getSize(list), "List size was incorrect");
+
+    list_addItem(list, &myTestItems[2]);
+
+    ASSERT_INT_EQUAL(3, list_getSize(list), "List size was incorrect");
+
+    capacity_t oldCapacity = capacity;
+    capacity = listCapacity(list);
+    ASSERT(capacity != oldCapacity, "Capacity should have changed but did not");
+    ASSERT_UINT_EQUAL(listOptions.capacity * listOptions.growthFactor, capacity, "Capacity was incorrect");
+
+    ASSERT_INT_EQUAL(myTestItems[0], *((int *) list_getItem(list, 0)), "Item was incorrect");
+    ASSERT_INT_EQUAL(myTestItems[1], *((int *) list_getItem(list, 1)), "Item was incorrect");
+
+    list_destroy(list);
+}
+
+TEST("List modify items") {
+    List *list = list_create();
+
+    int *myInt = malloc(sizeof(int));
+    *myInt = myTestItems[0];
+
+    list_setItem(list, 0, myInt);
 
     int *result = (int *) list_getItem(list, 0);
+    ASSERT_NOT_NULL(result, "result should not be NULL");
+    ASSERT_INT_EQUAL(myTestItems[0], *result, "List getItem items were not equal");
 
-    ASSERT_NOT_NULL(result, "Result should not be null");
+    *myInt = myTestItems[9];
+    result = (int *) list_getItem(list, 0);
+    ASSERT_NOT_NULL(result, "result should not be NULL");
+    ASSERT_INT_EQUAL(myTestItems[9], *result, "List getItem items were not equal");
 
-    ASSERT_INT_EQUAL(myInt, *result, "List get item was incorrect");
+    int **myIntReference = &myInt;
+    list_setItem(list, 0, myIntReference);
+    int **resultReference = (int **) list_getItem(list, 0);
+    ASSERT_NOT_NULL(*resultReference, "result reference should not be null");
+    *myIntReference = NULL;
+    resultReference = (int **) list_getItem(list, 0);
+    ASSERT_NULL(*resultReference, "result reference should be null");
 
+    free(myInt);
     list_destroy(list);
 }
 
-TEST_CASE("Access items after list destroy", TAG) {
+TEST("List setItem") {
     List *list = list_create();
 
-    const int itemCount = 128;
-    const int size = (int) (sizeof(int) * itemCount);
-    int *myItem = calloc(1, size);
-    for (int i = 0; i < itemCount; i++) {
-        myItem[i * sizeof(int)] = myInt;
-    }
+    ListError err = list_setItem(list, 0, &myTestItems[0]);
+    ASSERT(err == 0, "Expected no errors but actually was: %i", err);
+    int *result = list_getItem(list, 0);
+    ASSERT_NOT_NULL(result, "result should not be null");
+    ASSERT_INT_EQUAL(myTestItems[0], *result, "List item at index 0 was incorrect");
 
-    list_addItem(list, myItem);
+    list_addItem(list, &myTestItems[1]);
+    list_addItem(list, &myTestItems[2]);
+    list_addItem(list, &myTestItems[3]);
 
-    ASSERT_MEMORY_EQUAL(myItem, list_getItem(list, 0), size, "Items should be identical");
+    list_setItem(list, 2, &myTestItems[9]);
+    result = list_getItem(list, 2);
+    ASSERT_NOT_NULL(result, "result should not be null");
+    ASSERT_INT_EQUAL(myTestItems[9], *result, "List items at index %i were not equal", 2);
 
-    list_destroy(list);
-
-    list = NULL;
-
-    ASSERT_NOT_NULL(myItem, "Pointer should not be null");
-
-    char stringBuffer[128];
-    for (int i = 0; i < itemCount; i++) {
-        snprintf(stringBuffer, 128, "Pointer failed at %i", i);
-        ASSERT_INT_EQUAL(myInt, myItem[i * sizeof(int)], "%s", stringBuffer);
-    }
-}
-
-TEST_CASE("List change item data", TAG) {
-    // TODO: 09-Jul-2022 @basshelal: Item is added to list then changed here, should be reflected when calling list
-    //  .get() including with NULL
-}
-
-TEST_CASE("List growth", TAG) {
-    ListOptions *listOptions = list_defaultListOptions();
-    listOptions->capacity = 1;
-    listOptions->isGrowable = true;
-    List *list = list_createOptions(listOptions);
-
-    list_addItem(list, &myInt);
-
-    ASSERT_INT_EQUAL(1, list_size(list), "List size was incorrect");
-
-    const int myOtherInt = 420;
-
-    list_addItem(list, &myOtherInt);
-
-    ASSERT_INT_EQUAL(2, list_size(list), "List size was incorrect");
-
-    ASSERT_INT_EQUAL(myInt, *((int *) list_getItem(list, 0)), "Item was incorrect");
-    ASSERT_INT_EQUAL(myOtherInt, *((int *) list_getItem(list, 1)), "Item was incorrect");
+    list_setItem(list, 0, NULL);
+    result = list_getItem(list, 0);
+    ASSERT_NULL(result, "result should be NULL");
 
     list_destroy(list);
 }
 
-TEST_CASE("List set and get items", TAG) {
-    // TODO: 09-Jul-2022 @basshelal: Set and get items indexed and including NULL
-}
-
-TEST_CASE("List IndexOf", TAG) {
+TEST("List indexOfItem") {
     // TODO: 09-Jul-2022 @basshelal: Duplicates and non-existent
 }
 
-TEST_CASE("List add item", TAG) {
-    // TODO: 09-Jul-2022 @basshelal: Add item, add item indexed including NULL
+TEST("List indexOfItemFunction") {
+    // TODO: 09-Jul-2022 @basshelal: Duplicates and non-existent
 }
 
-TEST_CASE("List remove item", TAG) {
-    // TODO: 09-Jul-2022 @basshelal: Remove item, add item indexed including NULL and non-existent and duplicate
+TEST("List removeItem") {
+    // TODO: 09-Jul-2022 @basshelal: Remove item including NULL and non-existent and duplicate
+}
+
+TEST("List removeItemIndexed") {
+    // TODO: 09-Jul-2022 @basshelal: Remove item indexed including NULL and non-existent and duplicate
 }

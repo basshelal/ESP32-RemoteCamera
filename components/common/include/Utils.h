@@ -19,12 +19,14 @@ typedef unsigned int uint;
 typedef unsigned long ulong;
 
 #define alloc(size) calloc(size, sizeof(char))
+#define new(type) calloc(1, sizeof(type))
 
 // Requires Logger.h
 #define throw(error, message, ...) \
 ERROR(message, ##__VA_ARGS__);   \
 return error
 
+// Requires Logger.h
 #define require(condition, error, message, ...) \
 do{                                                  \
 if (!(condition)) {                                  \

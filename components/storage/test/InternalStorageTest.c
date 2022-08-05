@@ -7,16 +7,18 @@
 
 // TODO: 21-Jul-2022 @basshelal: Add test cases to test for expected failures (functions that should fail)
 
-#define TAG "[InternalStorage]"
+#define TEST_TAG "[InternalStorage]"
+#define TEST(name) TEST_CASE(name, TEST_TAG)
+#define XTEST(name) XTEST_CASE(name, TEST_TAG)
 
-TEST_CASE("Internal storage init and destroy", TAG) {
+XTEST("Internal storage init and destroy") {
     StorageError err = internalStorage_init();
-    ASSERT(err == STORAGE_ERROR_NONE, "Error should be NONE but was: %s", storageError_toString(err))
+    ASSERT(err == STORAGE_ERROR_NONE, "Error should be NONE but was: %s", storageError_toString(err));
     err = internalStorage_destroy();
-    ASSERT(err == STORAGE_ERROR_NONE, "Error should be NONE but was: %s", storageError_toString(err))
+    ASSERT(err == STORAGE_ERROR_NONE, "Error should be NONE but was: %s", storageError_toString(err));
 }
 
-TEST_CASE("Internal storage file operations", TAG) {
+XTEST("Internal storage file operations") {
     internalStorage_init();
 
     const char *filePath = "MyTestFile";
@@ -24,7 +26,7 @@ TEST_CASE("Internal storage file operations", TAG) {
     bool exists;
 
     exists = internalStorage_queryFileExists(filePath);
-    ASSERT(!exists, "File should not exist but does")
+    ASSERT(!exists, "File should not exist but does");
 
     const int textSize = 128;
     char originalText[textSize];
@@ -36,7 +38,7 @@ TEST_CASE("Internal storage file operations", TAG) {
     ASSERT_INT_EQUAL(textSize, bytesWritten, "writeFile() written bytes were not equal");
 
     exists = internalStorage_queryFileExists(filePath);
-    ASSERT(exists, "File should exist but does not")
+    ASSERT(exists, "File should exist but does not");
 
     uint fileSize;
     err = internalStorage_queryFileSize(filePath, &fileSize);
@@ -54,12 +56,12 @@ TEST_CASE("Internal storage file operations", TAG) {
     ASSERT_INT_EQUAL(STORAGE_ERROR_NONE, err, "deleteFile() should not return error");
 
     exists = internalStorage_queryFileExists(filePath);
-    ASSERT(!exists, "File should not exist but does")
+    ASSERT(!exists, "File should not exist but does");
 
     internalStorage_destroy();
 }
 
-TEST_CASE("Internal storage key operations with String", TAG) {
+XTEST("Internal storage key operations with String") {
     internalStorage_init();
 
     const char *key = "MyTestKey";
@@ -67,7 +69,7 @@ TEST_CASE("Internal storage key operations with String", TAG) {
     bool exists;
 
     exists = internalStorage_hasKey(key);
-    ASSERT(!exists, "Key should not exist but does")
+    ASSERT(!exists, "Key should not exist but does");
 
     const int textSize = 128;
     char originalText[textSize];
@@ -84,7 +86,7 @@ TEST_CASE("Internal storage key operations with String", TAG) {
     ASSERT_INT_EQUAL(STORAGE_ERROR_NONE, err, "deleteKey() should not return error");
 
     exists = internalStorage_hasKey(key);
-    ASSERT(!exists, "Key should not exist but does")
+    ASSERT(!exists, "Key should not exist but does");
 
     internalStorage_destroy();
 }

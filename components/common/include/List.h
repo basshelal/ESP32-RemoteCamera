@@ -1,6 +1,7 @@
 #ifndef ESP32_REMOTECAMERA_LIST_H
 #define ESP32_REMOTECAMERA_LIST_H
 
+#include "Utils.h"
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -18,9 +19,11 @@ typedef void List;
 /** Opaque pointer for a ListItem, safe to cast to any pointer */
 typedef void ListItem;
 
-typedef int index_t;
+typedef uint index_t;
 
-typedef int capacity_t;
+typedef uint capacity_t;
+
+#define LIST_INVALID_INDEX_CAPACITY UINT32_MAX
 
 typedef enum ListError {
     /** No error */
@@ -31,8 +34,6 @@ typedef enum ListError {
     LIST_ERROR_CAPACITY_EXCEEDED,
     /** When a requested item was not found */
     LIST_ERROR_ITEM_NOT_FOUND,
-    /** Passed in index was negative */
-    LIST_ERROR_NEGATIVE_INDEX,
     /** Passed in index was out of bounds (but positive) */
     LIST_ERROR_INDEX_OUT_OF_BOUNDS,
 } ListError;
@@ -56,20 +57,27 @@ typedef struct ListOptions {
 /** Initial capacity when none was given */
 #define LIST_DEFAULT_INITIAL_CAPACITY 10
 
-/** Create a new ListOptions with default values, this performs a call to malloc */
+#define LIST_DEFAULT_OPTIONS \
+{.capacity=LIST_DEFAULT_INITIAL_CAPACITY,\
+ .isGrowable=true,.growthFactor=LIST_GROWTH_FACTOR,\
+ .errorCallback=NULL\
+}
+
+/** Create a new ListOptions with default values, this performs a call to malloc, must be freed when done */
 extern ListOptions *list_defaultListOptions();
 
 /** Create and return a list with default options from list_defaultListOptions() */
 extern List *list_create();
 
-/** Create and return a new list with the list options, if options was NULL will use list_defaultListOptions() */
-extern List *list_createOptions(const ListOptions *listOptions);
+/** Create and return a new list with the list options, if options was NULL will use list_defaultListOptions()
+ * Does not use the passed in listOptions after the call, you should free listOptions if it was malloced*/
+extern List *list_createWithOptions(const ListOptions *listOptions);
 
 /** Destroy the list and free used resources, list is unsafe to use after this call, items will still be safe to use */
 extern void list_destroy(List *list);
 
 /** Get the current size of the list, -1 if the list is NULL */
-extern capacity_t list_size(const List *list);
+extern capacity_t list_getSize(const List *list);
 
 /** true if the list is empty ie size == 0 (or NULL), false otherwise */
 extern bool list_isEmpty(const List *list);
@@ -108,5 +116,8 @@ extern ListError list_removeItemIndexed(const List *list, const index_t index);
  * the elements in the list are still safe to use and should be freed or cleaned up by the caller
  * Any further modifications to the list will overwrite into memory locations of old elements */
 extern ListError list_clear(const List *list);
+
+/** Equality check using == with the addresses, this is the default function used in list_indexOfItem */
+extern bool list_equalityByAddress(const ListItem *a, const ListItem *b);
 
 #endif //ESP32_REMOTECAMERA_LIST_H
