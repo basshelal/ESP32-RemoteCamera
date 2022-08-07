@@ -56,7 +56,7 @@ public ListError logList_getList(LogList *logList, List *listIn) {
     const capacity_t size = logList_getSize(this);
     const capacity_t capacity = logList_getCapacity(this);
     if (size < capacity) {
-        for (index_t index = 0; index < capacity; index++) {
+        for (index_t index = 0; index < size; index++) {
             err = list_addItem(listIn, list_getItem(this->list, index));
             if (err) return err;
         }

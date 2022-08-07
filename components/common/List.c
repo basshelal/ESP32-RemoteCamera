@@ -1,8 +1,6 @@
 #include "List.h"
 #include "Utils.h"
 #include <stdlib.h>
-#include <memory.h>
-#include <stdio.h>
 
 typedef struct ListData {
     /** List options set at creation time */
