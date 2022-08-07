@@ -21,13 +21,8 @@ private inline void list_callError(const ListData *this, const ListError error) 
 /** Grow the list, only call when growth is confirmed to be needed as this does no checks */
 private void list_grow(ListData *this) {
     const capacity_t newCapacity = this->options.capacity * this->options.growthFactor;
-    ListItem **newItems = calloc(newCapacity, sizeof(ListItem *));
-    for (int i = 0; i < this->options.capacity; i++) {
-        newItems[i] = this->items[i];
-    }
+    this->items = realloc(this->items, newCapacity * sizeof(ListItem *));
     this->options.capacity = newCapacity;
-    free(this->items);
-    this->items = newItems;
 }
 
 /** Shift all elements from startIndex (inclusive) until last element forward by one */
@@ -40,16 +35,15 @@ private ListError list_shiftRight(ListData *this, const index_t startIndex) {
             return LIST_ERROR_CAPACITY_EXCEEDED;
         }
     }
-    const index_t lastIndex = this->size - 1;
-    for (index_t i = lastIndex; i >= startIndex; i--) { // must loop backwards
-        this->items[i + 1] = this->items[i];
+    for (index_t i = this->size; i > startIndex; i--) { // must loop backwards
+        this->items[i] = this->items[i - 1];
     }
     return LIST_ERROR_NONE;
 }
 
-/** Shift all elements from end until endIndex (exclusive) backward by one */
-private void list_shiftLeft(ListData *this, const index_t endIndex) {
-    for (int i = 0; i < endIndex; i++) {
+/** Shift all elements from end until startIndex (inclusive) backward by one */
+private void list_shiftLeft(ListData *this, const index_t startIndex) {
+    for (index_t i = startIndex; i < this->size; i++) {
         this->items[i] = this->items[i + 1];
     }
 }
@@ -161,21 +155,19 @@ public ListError list_addItem(const List *list, const ListItem *item) {
 public ListError list_addItemIndexed(const List *list, const index_t index, const ListItem *item) {
     if (!list) return LIST_ERROR_NULL_LIST;
     ListData *this = (ListData *) list;
-    const index_t lastIndex = this->size - 1;
-    if (index > lastIndex) {
+
+    if (index == this->size) { // index is the next writable index, equivalent to addItem()
+        return list_addItem(list, item); // let addItem() handle possible growth
+    } else if (index > this->size) {
         list_callError(this, LIST_ERROR_INDEX_OUT_OF_BOUNDS);
         return LIST_ERROR_INDEX_OUT_OF_BOUNDS;
     }
-    if (index == lastIndex) {
-        return list_addItem(list, item);
+    ListError err;
+    if ((err = list_shiftRight(this, index)) == LIST_ERROR_NONE) {
+        this->size++;
+        return list_setItem(list, index, item);
     } else {
-        ListError err;
-        if ((err = list_shiftRight(this, index)) == LIST_ERROR_NONE) {
-            this->size++;
-            return list_setItem(list, lastIndex, item);
-        } else {
-            return err;
-        }
+        return err;
     }
 }
 
@@ -198,8 +190,7 @@ public ListError list_removeItemIndexed(const List *list, const index_t index) {
     if (index > lastIndex) {
         list_callError(this, LIST_ERROR_INDEX_OUT_OF_BOUNDS);
         return LIST_ERROR_INDEX_OUT_OF_BOUNDS;
-    }
-    if (index == lastIndex) {
+    } else if (index == lastIndex) {
         this->size--;
     } else {
         list_shiftLeft(this, index);

@@ -11,6 +11,9 @@
 
 int myTestItems[10] = {1, 2, 4, 8, 16, 32, 64, 128, 256, 512};
 
+// TODO: 07-Aug-2022 @basshelal: These could be cleaned up better, also error checking tests could be added
+//  but so far this is the minimal required
+
 TEST("List create") {
     List *list = list_create();
     ASSERT_NOT_NULL(list, "List should not be null");
@@ -142,7 +145,25 @@ TEST("List addItem") {
 }
 
 TEST("List addItemIndexed") {
-// TODO: 05-Aug-2022 @basshelal: AddItem including NULL and differing types and sizes, in end or beginning or middle
+    List *list = list_create();
+
+    list_addItemIndexed(list, 0, &myTestItems[0]);
+    int *result = list_getItem(list, 0);
+    ASSERT_NOT_NULL(result, "result should not be null");
+    ASSERT_INT_EQUAL(myTestItems[0], *result, "items were not equal");
+
+    list_addItem(list, &myTestItems[1]);
+    list_addItem(list, &myTestItems[2]);
+    ASSERT_UINT_EQUAL(3, list_getSize(list), "size was not correct");
+
+    list_addItemIndexed(list, 0, NULL);
+    ASSERT_NULL(list_getItem(list, 0), "result should be null");
+    ASSERT_UINT_EQUAL(4, list_getSize(list), "size was not correct");
+    result = list_getItem(list, 1);
+    ASSERT_NOT_NULL(result, "result should not be null");
+    ASSERT_INT_EQUAL(myTestItems[0], *result, "items were not equal");
+
+    list_destroy(list);
 }
 
 TEST("List getItem") {
@@ -253,17 +274,103 @@ TEST("List setItem") {
 }
 
 TEST("List indexOfItem") {
-    // TODO: 09-Jul-2022 @basshelal: Duplicates and non-existent
+    List *list = list_create();
+
+    list_addItem(list, NULL);
+    list_addItem(list, &myTestItems[0]);
+    list_addItem(list, &myTestItems[1]);
+    list_addItem(list, &myTestItems[2]);
+    list_addItem(list, &myTestItems[2]); // intentional duplicate
+
+    index_t index = list_indexOfItem(list, NULL);
+    ASSERT_UINT_EQUAL(0, index, "index was incorrect");
+
+    index = list_indexOfItem(list, &myTestItems[2]);
+    ASSERT_UINT_EQUAL(3, index, "index was incorrect");
+
+    index = list_indexOfItem(list, &myTestItems[9]);
+    ASSERT_UINT_EQUAL(LIST_INVALID_INDEX_CAPACITY, index, "index was incorrect");
+
+    list_destroy(list);
+}
+
+static bool equalityAlwaysTrue(const ListItem *a, const ListItem *b) {
+    return true;
+}
+
+static bool equalityAlwaysFalse(const ListItem *a, const ListItem *b) {
+    return false;
 }
 
 TEST("List indexOfItemFunction") {
-    // TODO: 09-Jul-2022 @basshelal: Duplicates and non-existent
+    List *list = list_create();
+
+    list_addItem(list, NULL);
+    list_addItem(list, &myTestItems[0]);
+    list_addItem(list, &myTestItems[1]);
+    list_addItem(list, &myTestItems[2]);
+    list_addItem(list, &myTestItems[2]); // intentional duplicate
+
+    index_t index = list_indexOfItemFunction(list, NULL, equalityAlwaysTrue);
+    ASSERT_UINT_EQUAL(0, index, "index was incorrect");
+    index = list_indexOfItemFunction(list, &myTestItems[9], equalityAlwaysTrue);
+    ASSERT_UINT_EQUAL(0, index, "index was incorrect");
+
+    index = list_indexOfItemFunction(list, NULL, equalityAlwaysFalse);
+    ASSERT_UINT_EQUAL(LIST_INVALID_INDEX_CAPACITY, index, "index was incorrect");
+    index = list_indexOfItemFunction(list, &myTestItems[9], equalityAlwaysFalse);
+    ASSERT_UINT_EQUAL(LIST_INVALID_INDEX_CAPACITY, index, "index was incorrect");
+
+    list_destroy(list);
 }
 
 TEST("List removeItem") {
-    // TODO: 09-Jul-2022 @basshelal: Remove item including NULL and non-existent and duplicate
+    List *list = list_create();
+
+    list_addItem(list, NULL);
+    list_addItem(list, &myTestItems[0]);
+    list_addItem(list, &myTestItems[1]);
+    list_addItem(list, &myTestItems[2]);
+    list_addItem(list, &myTestItems[2]); // intentional duplicate
+
+    ASSERT_UINT_EQUAL(5, list_getSize(list), "size was incorrect");
+
+    list_removeItem(list, NULL);
+    ASSERT_UINT_EQUAL(4, list_getSize(list), "size was incorrect");
+    int *result = list_getItem(list, 0);
+    ASSERT_INT_EQUAL(myTestItems[0], *result, "items were not equal");
+
+    list_removeItem(list, &myTestItems[9]);
+    ASSERT_UINT_EQUAL(4, list_getSize(list), "size was incorrect");
+
+    list_removeItem(list, &myTestItems[2]);
+    ASSERT_UINT_EQUAL(3, list_getSize(list), "size was incorrect");
+    result = list_getItem(list, 2);
+    ASSERT_INT_EQUAL(myTestItems[2], *result, "items were not equal");
+
+    list_destroy(list);
 }
 
 TEST("List removeItemIndexed") {
-    // TODO: 09-Jul-2022 @basshelal: Remove item indexed including NULL and non-existent and duplicate
+    List *list = list_create();
+
+    list_addItem(list, NULL);
+    list_addItem(list, &myTestItems[0]);
+    list_addItem(list, &myTestItems[1]);
+    list_addItem(list, &myTestItems[2]);
+    list_addItem(list, &myTestItems[2]); // intentional duplicate
+
+    ASSERT_UINT_EQUAL(5, list_getSize(list), "size was incorrect");
+
+    list_removeItemIndexed(list, 0);
+    ASSERT_UINT_EQUAL(4, list_getSize(list), "size was incorrect");
+    int *result = list_getItem(list, 0);
+    ASSERT_INT_EQUAL(myTestItems[0], *result, "items were not equal");
+
+    list_removeItemIndexed(list, 3);
+    ASSERT_UINT_EQUAL(3, list_getSize(list), "size was incorrect");
+    result = list_getItem(list, 2);
+    ASSERT_INT_EQUAL(myTestItems[2], *result, "items were not equal");
+
+    list_destroy(list);
 }
