@@ -1,11 +1,14 @@
 #include "LogList.h"
 #include <stdlib.h>
+#include <string.h>
 #include "List.h"
 
 typedef struct {
     List *list;
+    char *memory;
     LogListOptions options;
     index_t nextWriteIndex;
+    List *onAppendCallbacks;
 } LogListData;
 
 public LogList *logList_create(const LogListOptions *options) {
@@ -21,6 +24,9 @@ public LogList *logList_create(const LogListOptions *options) {
     listOptions.errorCallback = NULL;
     this->list = list_createWithOptions(&listOptions);
     this->nextWriteIndex = 0;
+    this->memory = calloc(options->capacity * options->lineSize, sizeof(char));
+    assert(this->memory != NULL);
+    this->onAppendCallbacks = list_create();
     return this;
 }
 
@@ -40,10 +46,19 @@ public LogListOptions *logList_defaultOptions() {
 public void logList_append(LogList *logList, const char *string) {
     if (!logList || !string) return;
     LogListData *this = (LogListData *) logList;
-    list_setItem(this->list, this->nextWriteIndex, string);
+    const index_t offset = this->nextWriteIndex * this->options.lineSize;
+    char *pointer = this->memory + offset;
+    strncpy(pointer, string, this->options.lineSize);
+    list_setItem(this->list, this->nextWriteIndex, pointer);
     this->nextWriteIndex++;
     if (this->nextWriteIndex >= this->options.capacity) {
         this->nextWriteIndex = 0;
+    }
+    for (int i = 0; i < list_getSize(this->onAppendCallbacks); i++) {
+        LogListOnAppendCallback onAppendCallback = list_getItem(this->onAppendCallbacks, i);
+        if (onAppendCallback != NULL) {
+            onAppendCallback(this, pointer);
+        }
     }
 }
 
@@ -90,4 +105,16 @@ public void logList_clear(LogList *logList) {
     LogListData *this = (LogListData *) logList;
     list_clear(this->list);
     this->nextWriteIndex = 0;
+}
+
+public void logList_addOnAppendCallback(LogList *logList, LogListOnAppendCallback onAppendCallback) {
+    if (!logList) return;
+    LogListData *this = (LogListData *) logList;
+    list_addItem(this->onAppendCallbacks, onAppendCallback);
+}
+
+public void logList_removeOnAppendCallback(LogList *logList, LogListOnAppendCallback onAppendCallback) {
+    if (!logList) return;
+    LogListData *this = (LogListData *) logList;
+    list_removeItem(this->onAppendCallbacks, onAppendCallback);
 }

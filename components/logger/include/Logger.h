@@ -4,6 +4,7 @@
 #include "Utils.h"
 #include "List.h"
 #include <esp_log.h>
+#include "LogList.h"
 
 typedef enum LogLevel {
     LOG_LEVEL_NONE = ESP_LOG_NONE,
@@ -20,6 +21,8 @@ extern void log_init();
 extern void log_addLogFunction(const LogFunction logFunction);
 
 extern void log_removeLogFunction(const LogFunction logFunction);
+
+extern LogList *log_getLogList();
 
 extern void log_log(const LogLevel logLevel, const char *tag, const char *format, const va_list vargs);
 

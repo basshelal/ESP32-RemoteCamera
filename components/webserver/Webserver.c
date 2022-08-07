@@ -1,16 +1,17 @@
 #include "Utils.h"
 #include "Webserver.h"
-#include <string.h>
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_http_server.h"
 #include "Logger.h"
 #include "InternalStorage.h"
 #include "FileMode.h"
+#include "cJSON.h"
 
 #define FILE_BUFFER_SIZE 4096
 private void *fileBuffer;
 private void *favIconFileBuffer;
+private LogList *logList;
 
 private esp_err_t webserver_emptyHandler(httpd_req_t *request) {
     INFO("URI: %s", request->uri);
@@ -92,6 +93,57 @@ private esp_err_t webserver_getFavIcon(httpd_req_t *request) {
     return ESP_OK;
 }
 
+private esp_err_t webserver_logHandler(httpd_req_t *request) {
+    capacity_t capacity = logList_getSize(logList);
+    ListOptions listOptions = LIST_DEFAULT_OPTIONS;
+    listOptions.capacity = capacity;
+    List *list = list_createWithOptions(&listOptions);
+    logList_getList(logList, list);
+    const capacity_t listSize = list_getSize(list);
+
+    cJSON *jsonObject = cJSON_CreateObject();
+    cJSON *linesArray = cJSON_CreateArray();
+    if (jsonObject == NULL || linesArray == NULL) {
+        httpd_resp_send_500(request);
+        return ESP_OK;
+    }
+    if (cJSON_AddNumberToObject(jsonObject, "lineCount", listSize) == false) {
+        httpd_resp_send_500(request);
+        return ESP_OK;
+    }
+    if (cJSON_AddItemToObject(jsonObject, "lines", linesArray) == false) {
+        httpd_resp_send_500(request);
+        return ESP_OK;
+    }
+    for (index_t i = 0; i < listSize; i++) {
+        const char *line = list_getItem(list, i);
+        if (line == NULL) continue;
+        cJSON *jsonLine = cJSON_CreateString(line);
+        if (jsonLine != NULL) {
+            cJSON_AddItemToArray(linesArray, jsonLine);
+        }
+    }
+
+    const char *json = cJSON_PrintUnformatted(jsonObject);
+
+    if (json == NULL) {
+        httpd_resp_send_500(request);
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(request, "application/json");
+    httpd_resp_sendstr(request, json);
+
+    cJSON_Delete(linesArray);
+    free(json);
+    list_destroy(list);
+    return ESP_OK;
+}
+
+private void onAppendCallback(const LogList *_logList, const char *string) {
+    printf("append: %s\n", string);
+}
+
 public WebserverError webserver_init() {
     esp_err_t err;
     httpd_handle_t server = NULL;
@@ -116,6 +168,9 @@ public WebserverError webserver_init() {
     httpd_uri_t webPageHandler = {.uri= "/pages*", .method= HTTP_GET, .handler= webserver_pageHandler};
     httpd_register_uri_handler(server, &webPageHandler);
 
+    httpd_uri_t logApiHandler = {.uri= "/api/log", .method= HTTP_GET, .handler= webserver_logHandler};
+    httpd_register_uri_handler(server, &logApiHandler);
+
     httpd_uri_t rootHandler = {.uri= "/", .method= HTTP_GET, .handler= webserver_pageHandler};
     httpd_register_uri_handler(server, &rootHandler);
 
@@ -125,6 +180,8 @@ public WebserverError webserver_init() {
 
     fileBuffer = alloc(FILE_BUFFER_SIZE);
     favIconFileBuffer = alloc(FILE_BUFFER_SIZE);
+    logList = log_getLogList();
+    logList_addOnAppendCallback(logList, onAppendCallback);
 
     return ESP_OK;
 }
