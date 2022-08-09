@@ -5,7 +5,12 @@ export class ApiError extends Error {
     }
 }
 
-export interface BatteryInfo {
+export interface ApiLogResponse {
+    lineCount: number,
+    lines: Array<string>
+}
+
+export interface ApiBatteryResponse {
     percentage: number
     voltage: number
 }

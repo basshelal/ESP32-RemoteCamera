@@ -9,17 +9,30 @@
 #include "cJSON.h"
 
 #define FILE_BUFFER_SIZE 4096
+
+private httpd_handle_t server;
 private void *fileBuffer;
 private void *favIconFileBuffer;
 private LogList *logList;
 
-private esp_err_t webserver_emptyHandler(httpd_req_t *request) {
+#define requestHandler(endpoint, name) private esp_err_t requestHandler_ ## name(httpd_req_t *request)
+#define allowCORS(request) httpd_resp_set_hdr(request, "Access-Control-Allow-Origin", "*")
+
+typedef struct {
+    List *socketsList;
+    const char *string;
+} WebsocketAsyncData;
+private WebsocketAsyncData *asyncData;
+
+requestHandler(NULL, 404) {
+    allowCORS(request);
     INFO("URI: %s", request->uri);
     httpd_resp_send_404(request);
     return ESP_OK;
 }
 
-private esp_err_t webserver_pageHandler(httpd_req_t *request) {
+requestHandler("/pages", pages) {
+    allowCORS(request);
     INFO("URI: %s", request->uri);
     httpd_resp_set_status(request, HTTPD_200);
     const bool exists = internalStorage_queryFileExists("index.html");
@@ -59,7 +72,8 @@ private esp_err_t webserver_pageHandler(httpd_req_t *request) {
     return ESP_OK;
 }
 
-private esp_err_t webserver_getFavIcon(httpd_req_t *request) {
+requestHandler("/pages/favicon", favIcon) {
+    allowCORS(request);
     INFO("URI: %s", request->uri);
     httpd_resp_set_status(request, HTTPD_200);
     const bool exists = internalStorage_queryFileExists("favicon.ico");
@@ -93,7 +107,9 @@ private esp_err_t webserver_getFavIcon(httpd_req_t *request) {
     return ESP_OK;
 }
 
-private esp_err_t webserver_logHandler(httpd_req_t *request) {
+requestHandler("/api/log", apiLog) {
+    allowCORS(request);
+    INFO("URI: %s", request->uri);
     capacity_t capacity = logList_getSize(logList);
     ListOptions listOptions = LIST_DEFAULT_OPTIONS;
     listOptions.capacity = capacity;
@@ -140,13 +156,72 @@ private esp_err_t webserver_logHandler(httpd_req_t *request) {
     return ESP_OK;
 }
 
+requestHandler("/api/battery", apiBattery) {
+    allowCORS(request);
+    httpd_resp_set_status(request, HTTPD_500);
+    httpd_resp_sendstr(request, "Not yet implemented!");
+    // TODO: 08-Aug-2022 @basshelal: Implement
+    return ESP_OK;
+    return ESP_OK;
+}
+
+requestHandler("/socket/log", socketLog) {
+    allowCORS(request);
+    INFO("URI: %s", request->uri);
+    INFO("Method: %s", http_method_str(request->method));
+    int socketNumber = httpd_req_to_sockfd(request);
+    if (socketNumber == -1) return ESP_OK;
+    int *socketNumberPtr = malloc(sizeof(int));
+    *socketNumberPtr = socketNumber;
+    list_addItem(asyncData->socketsList, socketNumberPtr);
+    INFO("Socket fd: %i", socketNumber);
+    if (request->method == HTTP_GET) {
+        httpd_resp_set_status(request, HTTPD_200);
+        return ESP_OK;
+    }
+    return ESP_OK;
+}
+
+private void sendLogToWebSocketClients(void *arg) {
+    WebsocketAsyncData *asyncDataLocal = (WebsocketAsyncData *) arg;
+    if (!asyncDataLocal || !asyncDataLocal->socketsList) return;
+    ListOptions options = LIST_DEFAULT_OPTIONS;
+    options.capacity = list_getSize(asyncDataLocal->socketsList);
+    List *indicesToRemove = list_create();
+    for (int i = 0; i < list_getSize(asyncDataLocal->socketsList); i++) {
+        int *socketPtr = list_getItem(asyncDataLocal->socketsList, i);
+        if (!socketPtr) continue;
+        httpd_ws_frame_t websocketFrame = {};
+        websocketFrame.type = HTTPD_WS_TYPE_TEXT;
+        websocketFrame.payload = asyncDataLocal->string;
+        websocketFrame.len = strlen(asyncDataLocal->string);
+        esp_err_t err = httpd_ws_send_frame_async(server, *socketPtr, &websocketFrame);
+        if (err) {
+            if (err == ESP_ERR_INVALID_ARG) {
+                int *indexPtr = malloc(sizeof(int));
+                *indexPtr = i;
+                list_addItem(indicesToRemove, indexPtr);
+            }
+        }
+    }
+    for (int i = 0; i < list_getSize(indicesToRemove); i++) {
+        int *indexPtr = list_getItem(indicesToRemove, i);
+        int *socketNumber = list_getItem(asyncDataLocal->socketsList, *indexPtr);
+        list_removeItemIndexed(asyncDataLocal->socketsList, *indexPtr);
+        free(indexPtr);
+        free(socketNumber);
+    }
+    list_destroy(indicesToRemove);
+}
+
 private void onAppendCallback(const LogList *_logList, const char *string) {
-    printf("append: %s\n", string);
+    asyncData->string = string;
+    httpd_queue_work(server, sendLogToWebSocketClients, asyncData);
 }
 
 public WebserverError webserver_init() {
     esp_err_t err;
-    httpd_handle_t server = NULL;
+    server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
     config.max_uri_handlers = 128;
@@ -156,22 +231,29 @@ public WebserverError webserver_init() {
     err = httpd_start(&server, &config);
     if (err != ESP_OK) {
         ERROR("Failed to start Web Server! %i %s", err, esp_err_to_name(err));
-        return ESP_FAIL;
+        return WEBSERVER_ERROR_GENERIC_FAILURE;
     }
 
-    httpd_uri_t favIconHandler = {.uri= "/pages/favicon.*", .method= HTTP_GET, .handler= webserver_getFavIcon};
+    httpd_uri_t favIconHandler = {.uri= "/pages/favicon.*", .method= HTTP_GET, .handler= requestHandler_favIcon};
     httpd_register_uri_handler(server, &favIconHandler);
 
-    httpd_uri_t blobHandler = {.uri= "/pages/blob*", .method= HTTP_GET, .handler= webserver_emptyHandler};
+    httpd_uri_t blobHandler = {.uri= "/pages/blob*", .method= HTTP_GET, .handler= requestHandler_404};
     httpd_register_uri_handler(server, &blobHandler);
 
-    httpd_uri_t webPageHandler = {.uri= "/pages*", .method= HTTP_GET, .handler= webserver_pageHandler};
+    httpd_uri_t webPageHandler = {.uri= "/pages*", .method= HTTP_GET, .handler= requestHandler_pages};
     httpd_register_uri_handler(server, &webPageHandler);
 
-    httpd_uri_t logApiHandler = {.uri= "/api/log", .method= HTTP_GET, .handler= webserver_logHandler};
+    httpd_uri_t logApiHandler = {.uri= "/api/log", .method= HTTP_GET, .handler= requestHandler_apiLog};
     httpd_register_uri_handler(server, &logApiHandler);
 
-    httpd_uri_t rootHandler = {.uri= "/", .method= HTTP_GET, .handler= webserver_pageHandler};
+    httpd_uri_t batteryApiHandler = {.uri= "/api/battery", .method= HTTP_GET, .handler= requestHandler_apiBattery};
+    httpd_register_uri_handler(server, &batteryApiHandler);
+
+    httpd_uri_t logSocketHandler = {.uri= "/socket/log", .method= HTTP_GET, .handler= requestHandler_socketLog,
+            .is_websocket= true};
+    httpd_register_uri_handler(server, &logSocketHandler);
+
+    httpd_uri_t rootHandler = {.uri= "/", .method= HTTP_GET, .handler= requestHandler_pages};
     httpd_register_uri_handler(server, &rootHandler);
 
     INFO("Web Server started!");
@@ -182,6 +264,11 @@ public WebserverError webserver_init() {
     favIconFileBuffer = alloc(FILE_BUFFER_SIZE);
     logList = log_getLogList();
     logList_addOnAppendCallback(logList, onAppendCallback);
+    asyncData = new(WebsocketAsyncData);
+    ListOptions socketsListOptions = LIST_DEFAULT_OPTIONS;
+    socketsListOptions.isGrowable = true;
+    socketsListOptions.capacity = 8;
+    asyncData->socketsList = list_createWithOptions(&socketsListOptions);
 
-    return ESP_OK;
+    return WEBSERVER_ERROR_NONE;
 }

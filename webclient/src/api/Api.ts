@@ -1,51 +1,57 @@
-import {ApiError, BatteryInfo} from "./Types"
+import {ApiBatteryResponse, ApiError, ApiLogResponse} from "./Types"
+import {Constants} from "../Utils"
 
 export class Api {
     private static join(...paths: Array<string>): string {
-        return paths.reduce((previous: string, current: string) => `${previous}/${current}`, "")
-    }
-
-    private static serverURL(): string {
-        return document.location.host
+        return paths.reduce((previous: string, current: string) => `${previous}/${current}`)
     }
 
     private static api(url: string): string {
-        return this.join(this.serverURL(), "api", url)
+        return this.join(Constants.ServerURLHost, "api", url)
     }
 
-    public static async getBattery(): Promise<BatteryInfo> {
+    public static async getBattery(): Promise<ApiBatteryResponse> {
         const url: string = this.api("battery")
         const response: Response = await fetch(url, {method: "GET"})
         if (response.ok) {
-            const json: BatteryInfo = await response.json()
+            const json: ApiBatteryResponse = await response.json()
             return json
         } else {
             throw new ApiError(url, response)
         }
     }
 
-    public static async getLogLines(): Promise<Array<string>> {
-        return [`Initial Line 0`, `Initial Line 1`]
-
+    public static async getLog(): Promise<ApiLogResponse> {
         const url: string = this.api("log")
         const response: Response = await fetch(url, {method: "GET"})
         if (response.ok) {
-            const json: Array<string> = await response.json()
+            const json: ApiLogResponse = await response.json()
             return json
         } else {
             throw new ApiError(url, response)
         }
     }
 
+    public static createLogWebSocket(): WebSocket {
+        const url = this.join(Constants.ServerURLHost, "socket", "log").replace("http", "ws")
+        const webSocket = new WebSocket(url)
+        webSocket.onopen = (event: Event) => {
+            console.log("Websocket opened!")
+        }
+        webSocket.onclose = (event: CloseEvent) => {
+            console.log("Websocket closed!")
+        }
+        return webSocket
+    }
+
     public static registerLinesEvent(root: HTMLElement): void {
-        let count = 0
-        setInterval(() => {
-            root.dispatchEvent(new CustomEvent("newLogLines", {
-                detail: {
-                    lines: [`Line: ${count++}`]
-                }
-            }))
-        }, 100)
+        // let count = 0
+        //
+        // root.dispatchEvent(new CustomEvent("newLogLines", {
+        //     detail: {
+        //         lines: [`Line: ${count++}`]
+        //     }
+        // }))
     }
 
     public static async postPassword(): Promise<void> {

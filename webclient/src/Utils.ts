@@ -1,9 +1,21 @@
-import {createRef, FunctionComponent, JSX, RefObject} from "preact"
+import {FunctionComponent, JSX} from "preact"
+import {EffectCallback, Inputs, useEffect} from "preact/hooks"
 
 export type FC<P = {}> = FunctionComponent<P>
 export  type JSXElement = JSX.Element
 
 export class Constants {
-    public static ServerURLHost: string = "192.168.0.30"
+    public static ServerURLHost: string = "http://192.168.0.123"
     public static readonly LogWebSocketURL: string = "wss://"
+}
+
+export function useEffectAsync(effect: () => Promise<void>, cleanup?: () => void, inputs?: Inputs): void {
+    useEffect(() => {
+        effect()
+        return cleanup
+    }, inputs)
+}
+
+export function useOnce(once: EffectCallback) : void {
+    useEffect(once, [false])
 }

@@ -9,7 +9,6 @@ export const Header: FC = (props, context): JSXElement => {
     const appContext: AppContextObject = useContext<AppContextObject>(AppContext)
 
     useEffect(() => {
-        console.log(appContext.context.appPage.name)
         const element = document.getElementById(`MenuItem${appContext.context.appPage.name}`)
         if (element) {
             element.style.backgroundColor = "#560027"

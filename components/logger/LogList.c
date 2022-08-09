@@ -24,6 +24,8 @@ public LogList *logList_create(const LogListOptions *options) {
     listOptions.errorCallback = NULL;
     this->list = list_createWithOptions(&listOptions);
     this->nextWriteIndex = 0;
+    // TODO: 08-Aug-2022 @basshelal: We can be a bit a more memory efficient by always calling a realloc on append
+    //  and re-setting the pointer at the index
     this->memory = calloc(options->capacity * options->lineSize, sizeof(char));
     assert(this->memory != NULL);
     this->onAppendCallbacks = list_create();
