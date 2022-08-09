@@ -130,7 +130,7 @@ public index_t list_indexOfItemFunction(const List *list, const ListItem *item,
         if (equalityFunction(this->items[i], item)) return i;
     }
     list_callError(this, LIST_ERROR_ITEM_NOT_FOUND);
-    return -1;
+    return LIST_INVALID_INDEX_CAPACITY;
 }
 
 public ListError list_addItem(const List *list, const ListItem *item) {

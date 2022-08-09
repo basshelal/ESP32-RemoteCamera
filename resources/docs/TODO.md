@@ -1,21 +1,18 @@
 # TODO
 
-## Log
-* Implement and add LogList which will be used by the webclient /log/ endpoint which will use
-  a websocket to return log lines
-* We should add an RGB LED capable of displaying multiple colors and effects to signal and detail
-  errors and progress such as WiFi connecting, failed, awaiting setup etc but only for more critical
-  and necessary signals, combining color, brightness, and effects (such as flashing with speed or even
-  patterns) means we can hardcode a (very) large number of signals, such a system could be used
-  on future projects as well
-
 ## Battery
 * Clean component structure
 * Battery voltage and percentage info
 
 ## WebServer/WebClient
 * Battery API endpoint
-* LogList websocket
+
+## Log
+* We should add an RGB LED capable of displaying multiple colors and effects to signal and detail
+  errors and progress such as WiFi connecting, failed, awaiting setup etc but only for more critical
+  and necessary signals, combining color, brightness, and effects (such as flashing with speed or even
+  patterns) means we can hardcode a (very) large number of signals, such a system could be used
+  on future projects as well
 
 ## WiFi
 

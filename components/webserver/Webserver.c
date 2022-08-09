@@ -18,6 +18,17 @@ private LogList *logList;
 #define requestHandler(endpoint, name) private esp_err_t requestHandler_ ## name(httpd_req_t *request)
 #define allowCORS(request) httpd_resp_set_hdr(request, "Access-Control-Allow-Origin", "*")
 
+private bool socketsListIntEquals(const ListItem *a, const ListItem *b) {
+    if (a == NULL && b == NULL) return true;
+    else if (a != NULL && b != NULL) {
+        int numA = *((int *) a);
+        int numb = *((int *) b);
+        return numA == numb;
+    } else {
+        return false;
+    }
+}
+
 typedef struct {
     List *socketsList;
     const char *string;
@@ -171,9 +182,15 @@ requestHandler("/socket/log", socketLog) {
     INFO("Method: %s", http_method_str(request->method));
     int socketNumber = httpd_req_to_sockfd(request);
     if (socketNumber == -1) return ESP_OK;
-    int *socketNumberPtr = malloc(sizeof(int));
+    int *socketNumberPtr = new(int);
     *socketNumberPtr = socketNumber;
-    list_addItem(asyncData->socketsList, socketNumberPtr);
+    index_t foundIndex = list_indexOfItemFunction(asyncData->socketsList, socketNumberPtr, socketsListIntEquals);
+    if (foundIndex == LIST_INVALID_INDEX_CAPACITY) {
+        list_addItem(asyncData->socketsList, socketNumberPtr);
+        printf("added socket number: %i\n", socketNumber);
+    } else {
+        free(socketNumberPtr);
+    }
     INFO("Socket fd: %i", socketNumber);
     if (request->method == HTTP_GET) {
         httpd_resp_set_status(request, HTTPD_200);
@@ -198,7 +215,7 @@ private void sendLogToWebSocketClients(void *arg) {
         esp_err_t err = httpd_ws_send_frame_async(server, *socketPtr, &websocketFrame);
         if (err) {
             if (err == ESP_ERR_INVALID_ARG) {
-                int *indexPtr = malloc(sizeof(int));
+                int *indexPtr = new(int);
                 *indexPtr = i;
                 list_addItem(indicesToRemove, indexPtr);
             }
@@ -208,6 +225,7 @@ private void sendLogToWebSocketClients(void *arg) {
         int *indexPtr = list_getItem(indicesToRemove, i);
         int *socketNumber = list_getItem(asyncDataLocal->socketsList, *indexPtr);
         list_removeItemIndexed(asyncDataLocal->socketsList, *indexPtr);
+        printf("removed socket number: %i\n", *socketNumber);
         free(indexPtr);
         free(socketNumber);
     }
@@ -267,7 +285,7 @@ public WebserverError webserver_init() {
     asyncData = new(WebsocketAsyncData);
     ListOptions socketsListOptions = LIST_DEFAULT_OPTIONS;
     socketsListOptions.isGrowable = true;
-    socketsListOptions.capacity = 8;
+    socketsListOptions.capacity = CONFIG_LWIP_MAX_SOCKETS;
     asyncData->socketsList = list_createWithOptions(&socketsListOptions);
 
     return WEBSERVER_ERROR_NONE;
