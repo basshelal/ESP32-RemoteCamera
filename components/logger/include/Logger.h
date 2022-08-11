@@ -30,14 +30,28 @@ __attribute__((format(printf, 3, 4)))
 extern void log_vargs(const LogLevel logLevel, const char *tag, const char *format, ...);
 
 #ifdef LOG_TAG
-#define LOG_TEMPLATE(s, ...) LOG_TAG, "%s:%d "s, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
+#define LOG_TEMPLATE(message, ...)\
+LOG_TAG, "%s:%d "message, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
 #else
-#define LOG_TEMPLATE(s, ...) __FILENAME__, "%s:%d "s, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
+#define LOG_TEMPLATE(message, ...)\
+__FILENAME__, "%s:%d "message, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
 #endif
 
 #define ERROR(message, ...) log_vargs(LOG_LEVEL_ERROR, LOG_TEMPLATE(message, ##__VA_ARGS__))
 #define WARN(message, ...) log_vargs(LOG_LEVEL_WARN, LOG_TEMPLATE(message, ##__VA_ARGS__))
 #define INFO(message, ...) log_vargs(LOG_LEVEL_INFO, LOG_TEMPLATE(message, ##__VA_ARGS__))
 #define VERBOSE(message, ...) log_vargs(LOG_LEVEL_VERBOSE, LOG_TEMPLATE(message, ##__VA_ARGS__))
+
+#define throw(error, message, ...) \
+ERROR(message, ##__VA_ARGS__);   \
+return error
+
+#define require(condition, error, message, ...) \
+do{                                                  \
+if (!(condition)) {                                  \
+throw(error, message, ##__VA_ARGS__);                \
+}}while(0)
+
+#define requireNotNull(pointer, error, message, ...) require(pointer != NULL, error, message, ##__VA_ARGS__)
 
 #endif //ESP32_REMOTECAMERA_LOGGER_H

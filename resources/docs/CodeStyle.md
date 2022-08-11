@@ -18,9 +18,13 @@ The filename must be the first thing followed by an `_` then the function name i
 This is in an attempt to emulate Java style syntax:
 ```java
 objectName.functionName(param1, param2); // member functions/methods
-ClassName.functionName(param1, param2); // static functions/methods
 ```
 
 ```c
-fileName_functionName(param1, param2); // global function
+fileName_functionName(object, param1); // global function
 ```
+
+Modules should always have an `init` function which will initialize the module, a `destroy` function is
+its counterpart and is optional since it would only be needed when the module could be done with, most modules
+will not be this way but occasionally some will be. It is a good idea to implement such a function regardless,
+in case a module becomes destructible in the future.

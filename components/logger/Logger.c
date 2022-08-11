@@ -36,6 +36,7 @@ public LogList *log_getLogList() {
 public void log_log(const LogLevel logLevel, const char *tag, const char *format, const va_list vargs) {
     private char string[1024];
     vsprintf(string, format, vargs);
+    // TODO: 11-Aug-2022 @basshelal: Copy ESP's logging format style (including colors maybe) into the string
     ESP_LOG_LEVEL((esp_log_level_t) logLevel, tag, "%s", string);
     for (int i = 0; i < list_getSize(this.functionsList); i++) {
         LogFunction function = (LogFunction) list_getItem(this.functionsList, i);

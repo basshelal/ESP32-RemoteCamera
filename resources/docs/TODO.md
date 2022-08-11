@@ -7,15 +7,27 @@
 ## WebServer/WebClient
 * Battery API endpoint
 
+## External Storage
+* Check for existing and valid external storage
+* External storage stats, remaining/used space, file count, dir count etc
+* Read dirs and files (using POSIX APIs)
+* Create dirs and files (using POSIX APIs)
+* Write (update and delete) dirs and files (using POSIX APIs)
+
 ## Log
 * We should add an RGB LED capable of displaying multiple colors and effects to signal and detail
   errors and progress such as WiFi connecting, failed, awaiting setup etc but only for more critical
   and necessary signals, combining color, brightness, and effects (such as flashing with speed or even
   patterns) means we can hardcode a (very) large number of signals, such a system could be used
   on future projects as well
+* Webpage could allow for colored lines depending on log level
+* Webpage should autofocus to log
+* Log could be black
+* Line count and scroll to bottom button under the log
+* Websocket status and websocket reconnect at the bottom under log
+* We can check websocket status by running a polling function that uses the socket?
 
 ## WiFi
-
 * WebServer calls WiFi to see if we can get an internet connection:
   Wifi checks if we have credentials stored to connect with: 
      true then try to connect with them until success or fail
@@ -38,13 +50,6 @@
 * GET app routes responding to preact router, likely prefixed with `/app/*`
 * GET HLS live stream resource, this can initially be a public HLS for testing purposes.
   (The HLS encoding from Camera to WebServer may be complex and need its own component)
-
-## External Storage
-* Check for existing and valid external storage
-* External storage stats, remaining/used space, file count, dir count etc
-* Read dirs and files (using POSIX APIs)
-* Create dirs and files (using POSIX APIs)
-* Write (update and delete) dirs and files (using POSIX APIs) 
 
 ## WebServer
 * GET View SD Card files

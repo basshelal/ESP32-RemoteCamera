@@ -9,13 +9,6 @@ export class Constants {
     public static readonly LogWebSocketURL: string = "wss://"
 }
 
-export function useEffectAsync(effect: () => Promise<void>, cleanup?: () => void, inputs?: Inputs): void {
-    useEffect(() => {
-        effect()
-        return cleanup
-    }, inputs)
-}
-
 export function useOnce(once: EffectCallback) : void {
     useEffect(once, [false])
 }

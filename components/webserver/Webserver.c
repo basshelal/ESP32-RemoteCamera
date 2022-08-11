@@ -75,10 +75,7 @@ requestHandler("/pages", pages) {
         }
         internalStorage_closeFile(file);
     } else {
-        char buffer[512];
-        sprintf(buffer, "%u at /* exists: %i", esp_log_timestamp(), exists);
-        httpd_resp_sendstr_chunk(request, buffer);
-        httpd_resp_send_chunk(request, NULL, 0);
+        httpd_resp_send_err(request, HTTPD_404_NOT_FOUND, "index.html could not be located");
     }
     return ESP_OK;
 }
@@ -187,7 +184,6 @@ requestHandler("/socket/log", socketLog) {
     index_t foundIndex = list_indexOfItemFunction(asyncData->socketsList, socketNumberPtr, socketsListIntEquals);
     if (foundIndex == LIST_INVALID_INDEX_CAPACITY) {
         list_addItem(asyncData->socketsList, socketNumberPtr);
-        printf("added socket number: %i\n", socketNumber);
     } else {
         free(socketNumberPtr);
     }
@@ -225,7 +221,6 @@ private void sendLogToWebSocketClients(void *arg) {
         int *indexPtr = list_getItem(indicesToRemove, i);
         int *socketNumber = list_getItem(asyncDataLocal->socketsList, *indexPtr);
         list_removeItemIndexed(asyncDataLocal->socketsList, *indexPtr);
-        printf("removed socket number: %i\n", *socketNumber);
         free(indexPtr);
         free(socketNumber);
     }
