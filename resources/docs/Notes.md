@@ -33,3 +33,6 @@ makes it free to use later. We just need to maintain a list of all the pointers 
 so there is a memory and performance cost for the benefit of predictability and control.
 
 The benefits are currently small though so this is likely more costly than beneficial as of writing.
+
+## Voltage Divider
+Video was this https://www.youtube.com/watch?v=L321aqTvrLQ

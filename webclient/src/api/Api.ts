@@ -12,10 +12,9 @@ export class Api {
 
     public static async getBattery(): Promise<ApiBatteryResponse> {
         const url: string = this.api("battery")
-        const response: Response = await fetch(url, {method: "GET"})
+        const response: Response = await fetch(url)
         if (response.ok) {
-            const json: ApiBatteryResponse = await response.json()
-            return json
+            return await response.json() as ApiBatteryResponse
         } else {
             throw new ApiError(url, response)
         }
@@ -23,35 +22,18 @@ export class Api {
 
     public static async getLog(): Promise<ApiLogResponse> {
         const url: string = this.api("log")
-        const response: Response = await fetch(url, {method: "GET"})
+        const response: Response = await fetch(url)
         if (response.ok) {
-            const json: ApiLogResponse = await response.json()
-            return json
+            return await response.json() as ApiLogResponse
         } else {
             throw new ApiError(url, response)
         }
     }
 
     public static createLogWebSocket(): WebSocket {
+        // TODO: Make the url a bit better
         const url = this.join(Constants.ServerURLHost, "socket", "log").replace("http", "ws")
-        const webSocket = new WebSocket(url)
-        webSocket.onopen = (event: Event) => {
-            console.log("Websocket opened!")
-        }
-        webSocket.onclose = (event: CloseEvent) => {
-            console.log("Websocket closed!")
-        }
-        return webSocket
-    }
-
-    public static registerLinesEvent(root: HTMLElement): void {
-        // let count = 0
-        //
-        // root.dispatchEvent(new CustomEvent("newLogLines", {
-        //     detail: {
-        //         lines: [`Line: ${count++}`]
-        //     }
-        // }))
+        return new WebSocket(url)
     }
 
     public static async postPassword(): Promise<void> {

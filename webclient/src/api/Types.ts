@@ -11,6 +11,7 @@ export interface ApiLogResponse {
 }
 
 export interface ApiBatteryResponse {
-    percentage: number
     voltage: number
+    percentage: number
+    isCharging: boolean
 }

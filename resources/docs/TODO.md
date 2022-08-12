@@ -1,12 +1,5 @@
 # TODO
 
-## Battery
-* Clean component structure
-* Battery voltage and percentage info
-
-## WebServer/WebClient
-* Battery API endpoint
-
 ## External Storage
 * Check for existing and valid external storage
 * External storage stats, remaining/used space, file count, dir count etc

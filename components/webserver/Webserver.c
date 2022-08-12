@@ -1,12 +1,12 @@
 #include "Utils.h"
 #include "Webserver.h"
 #include "esp_err.h"
-#include "esp_log.h"
 #include "esp_http_server.h"
 #include "Logger.h"
 #include "InternalStorage.h"
 #include "FileMode.h"
 #include "cJSON.h"
+#include "Battery.h"
 
 #define FILE_BUFFER_SIZE 4096
 
@@ -166,10 +166,16 @@ requestHandler("/api/log", apiLog) {
 
 requestHandler("/api/battery", apiBattery) {
     allowCORS(request);
-    httpd_resp_set_status(request, HTTPD_500);
-    httpd_resp_sendstr(request, "Not yet implemented!");
-    // TODO: 08-Aug-2022 @basshelal: Implement
-    return ESP_OK;
+    /*{ isCharging:boolean, voltage:number, percentage:number }*/
+    BatteryInfo batteryInfo = {};
+    battery_getInfo(&batteryInfo);
+    char buffer[128];
+    sprintf(buffer, "{\"isCharging\":%s,\"voltage\":%.f,\"percentage\":%.f}",
+            batteryInfo.isCharging ? "true" : "false",
+            batteryInfo.voltage, batteryInfo.percentage);
+    httpd_resp_set_type(request, "application/json");
+    httpd_resp_send(request, buffer, (ssize_t) strlen(buffer));
+    // TODO: 08-Aug-2022 @basshelal: Implement using cJSON?
     return ESP_OK;
 }
 

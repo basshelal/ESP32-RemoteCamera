@@ -1,14 +1,24 @@
 import {FunctionComponent, JSX} from "preact"
-import {EffectCallback, Inputs, useEffect} from "preact/hooks"
+import {EffectCallback, useEffect} from "preact/hooks"
 
 export type FC<P = {}> = FunctionComponent<P>
 export  type JSXElement = JSX.Element
 
 export class Constants {
     public static ServerURLHost: string = "http://192.168.0.123"
-    public static readonly LogWebSocketURL: string = "wss://"
+    public static readonly LogWebSocketURL: string = "ws://"
 }
 
-export function useOnce(once: EffectCallback) : void {
+export function useOnce(once: EffectCallback): void {
     useEffect(once, [false])
+}
+
+export class Logger {
+    public static info(...message: any) {console.log(...message)}
+
+    public static error(...message: any) {console.error(...message)}
+
+    public static warn(...message: any) {console.warn(...message)}
+
+    public static jsonify(object: any): string {return JSON.stringify(object)}
 }

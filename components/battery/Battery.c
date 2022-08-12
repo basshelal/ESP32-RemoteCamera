@@ -7,24 +7,16 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-// TODO: 17-Jul-2022 @basshelal: For more realtime accurate battery readings as well as determining if we are
-//  plugged in and charging the battery see: https://learn.adafruit.com/adafruit-huzzah32-esp32-feather?view=all#power-pins-2816344
-//  If we connect and read some of these pins, namely BAT and USB we can determine the current power state
-//  the ADC battery reading will be slightly higher when charging and so doesn't correctly represent the
-//  battery's voltage, the BAT pin is the most accurate one
-
-// TODO: 17-Jul-2022 @basshelal: Find a nice linear battery percentage function for this 3.7V battery because
-//  it doesn't change voltage linearly it hangs at 3.7V most of its life peaking at ~4.2V and dying at ~3.2V
-
-// TODO: 18-Jul-2022 @basshelal: Charging seems to add an additional .05V (50mV) to the battery
-
 #define BATTERY_TASK_NAME "batteryTask"
 #define BATTERY_TASK_STACK_SIZE 2200
 #define BATTERY_TASK_PRIORITY tskIDLE_PRIORITY
+#define BATTERY_MIN_VOLTAGE 2750.0F
+#define BATTERY_MAX_VOLTAGE 4200.0F
 
 private struct {
     adc1_channel_t batteryChannel;
-    esp_adc_cal_characteristics_t *batteryCharacteristics;
+    adc1_channel_t usbChannel;
+    esp_adc_cal_characteristics_t *characteristics;
     uint batterySamplesCount;
     // how many milliVolts determines if something changed ie margin of error
     float voltageReadingMarginOfError;
@@ -42,11 +34,11 @@ private struct {
     } task;
 } this;
 
-private uint battery_getRawReading(const uint samplesCount) {
+private uint battery_getAveragedReading(const adc1_channel_t channel, const uint samplesCount) {
     uint averagedReading = 0;
     uint samplesRetrieved = 0;
     for (uint i = 0; i < samplesCount; i++) {
-        const int reading = adc1_get_raw(this.batteryChannel);
+        const int reading = adc1_get_raw(channel);
         if (reading >= 0) {
             averagedReading += reading;
             samplesRetrieved++;
@@ -56,19 +48,32 @@ private uint battery_getRawReading(const uint samplesCount) {
     return averagedReading;
 }
 
-private float battery_getVoltageFromReading(const uint rawReading) {
-    const uint voltage = esp_adc_cal_raw_to_voltage(rawReading, this.batteryCharacteristics);
-    const float offset = battery_isCharging() ? 100.0F : 50.0F;
-    // TODO: 11-Aug-2022 @basshelal: For some reason there is always a 50mV offset in the reading, not sure why
+private uint battery_getUsbRawReading(const uint samplesCount) {
+    return battery_getAveragedReading(this.usbChannel, samplesCount);
+}
+
+private uint battery_getVoltageRawReading(const uint samplesCount) {
+    return battery_getAveragedReading(this.batteryChannel, samplesCount);
+}
+
+private float battery_getIsChargingVoltage(const uint rawReading) {
+    const uint voltage = esp_adc_cal_raw_to_voltage(rawReading, this.characteristics);
+    const float result = (float) voltage;
+    return result;
+}
+
+private float battery_getVoltageFromReading(const uint rawReading, const bool isCharging) {
+    const uint voltage = esp_adc_cal_raw_to_voltage(rawReading, this.characteristics);
+    const float offset = /*isCharging ? 100.0F :*/ 50.0F;
+    // above is just a fact from experience, can't explain why, probably the regulator or something
     const float result = (((float) voltage) * 2.0F) - offset;
     return result;
 }
 
-private float battery_getPercentageFromReading(const uint rawReading) {
-    const float voltage = battery_getVoltageFromReading(rawReading);
-    const float minOffset = 3300.0F;
-    const float max = 4200.0F - minOffset; // 900 mV is max meaning range is from 0 - 900mV
-    float offsetVoltage = voltage - minOffset;
+private float battery_getPercentageFromReading(const uint rawReading, const bool isCharging) {
+    const float voltage = battery_getVoltageFromReading(rawReading, isCharging);
+    const float max = BATTERY_MAX_VOLTAGE - BATTERY_MIN_VOLTAGE;
+    float offsetVoltage = voltage - BATTERY_MIN_VOLTAGE;
     if (offsetVoltage < 0) {
         offsetVoltage = 0;
     } else if (offsetVoltage > max) {
@@ -78,64 +83,9 @@ private float battery_getPercentageFromReading(const uint rawReading) {
     return percentage;
 }
 
-private void battery_taskFunction(void *arg) {
-    typeof(this) *thisPtr = (typeof(this) *) arg;
-    while (thisPtr->task.isRunning) {
-        const uint remaining = uxTaskGetStackHighWaterMark(thisPtr->task.handle);
-        if (remaining < 128) { // quit task if we run out of stack to avoid program crash
-            ERROR("Battery task ran out of stack, bytes remaining: %u", remaining);
-            // TODO: 11-Aug-2022 @basshelal: Implement some safe restart mechanism because this needs to always be
-            //  running
-            break;
-        }
-        battery_getInfo(&thisPtr->task.currentBatteryInfo);
-        const float previousVoltage = thisPtr->task.previousBatteryInfo.voltage;
-        const float currentVoltage = thisPtr->task.currentBatteryInfo.voltage;
-        const float previousPercentage = thisPtr->task.previousBatteryInfo.percentage;
-        const float currentPercentage = thisPtr->task.currentBatteryInfo.percentage;
-        const float voltageDifference = (float) fabs((double) previousVoltage - currentVoltage);
-        if (voltageDifference > thisPtr->voltageReadingMarginOfError) {
-            thisPtr->task.voltageSampleChangedCount++;
-            if (thisPtr->task.voltageSampleChangedCount > thisPtr->voltageSampleMarginOfError) {
-                const float percentageDifferance = (float) fabs((double) previousPercentage - currentPercentage);
-                if (percentageDifferance > 0.0F) {
-                    for (int i = 0; i < list_getSize(thisPtr->percentageChangedCallbacks); i++) {
-                        const PercentageChangedCallback callback = list_getItem(thisPtr->percentageChangedCallbacks, i);
-                        if (callback != NULL) {
-                            callback(previousPercentage, currentPercentage);
-                        }
-                    }
-                }
-                thisPtr->task.voltageSampleChangedCount = 0;
-                thisPtr->task.previousBatteryInfo = thisPtr->task.currentBatteryInfo;
-            }
-        }
-        INFO("(%.f%%, %.fmV) -> (%.f%%, %.fmV)",
-             previousPercentage, previousVoltage,
-             currentPercentage, currentVoltage
-        );
-        vTaskDelay(pdMS_TO_TICKS(thisPtr->task.pollMillis));
-    }
-    vTaskDelete(thisPtr->task.handle);
-}
+private void battery_taskFunction(void *arg);
 
-private void battery_percentageChangedCallback(const float oldValue, const float newValue) {
-    INFO("Percentage changed %f -> %f", oldValue, newValue);
-}
-
-public BatteryError battery_init() {
-    this.batteryCharacteristics = new(esp_adc_cal_characteristics_t);
-    this.batteryChannel = ADC1_CHANNEL_7;
-    this.batterySamplesCount = 128;
-    this.voltageReadingMarginOfError = 25.0F;
-    this.voltageSampleMarginOfError = 3;
-    this.percentageChangedCallbacks = list_create();
-    this.isChargingChangedCallbacks = list_create();
-    this.task.isRunning = true;
-    this.task.pollMillis = 1000;
-
-    list_addItem(this.percentageChangedCallbacks, battery_percentageChangedCallback);
-
+private void battery_startBatteryTask() {
     xTaskCreate(
             /*pvTaskCode=*/battery_taskFunction,
             /*pcName=*/BATTERY_TASK_NAME,
@@ -144,6 +94,76 @@ public BatteryError battery_init() {
             /*uxPriority=*/BATTERY_TASK_PRIORITY,
             /*pxCreatedTask=*/this.task.handle
     );
+}
+
+private void battery_taskFunction(void *arg) {
+    typeof(this) *thisPtr = (typeof(this) *) arg;
+    // initialize previous info to avoid a change event on first run because previous was all 0s
+    battery_getInfo(&thisPtr->task.previousBatteryInfo);
+    while (thisPtr->task.isRunning) {
+        const uint remaining = uxTaskGetStackHighWaterMark(thisPtr->task.handle);
+        if (remaining < 128) { // quit task if we run out of stack to avoid program crash
+            ERROR("Battery task ran out of stack, bytes remaining: %u", remaining);
+            // TODO: 11-Aug-2022 @basshelal: Notify the main task that we need to restart, we can't do it from here
+            break;
+        }
+        battery_getInfo(&thisPtr->task.currentBatteryInfo);
+        const bool previousIsCharging = thisPtr->task.previousBatteryInfo.isCharging;
+        const bool currentIsCharging = thisPtr->task.currentBatteryInfo.isCharging;
+        const float previousVoltage = thisPtr->task.previousBatteryInfo.voltage;
+        const float currentVoltage = thisPtr->task.currentBatteryInfo.voltage;
+        const float previousPercentage = thisPtr->task.previousBatteryInfo.percentage;
+        const float currentPercentage = thisPtr->task.currentBatteryInfo.percentage;
+        const float voltageDifference = (float) fabs((double) previousVoltage - currentVoltage);
+        if (voltageDifference > thisPtr->voltageReadingMarginOfError) {
+            if (thisPtr->task.voltageSampleChangedCount > thisPtr->voltageSampleMarginOfError) {
+                const float percentageDifferance = (float) fabs((double) previousPercentage - currentPercentage);
+                if (percentageDifferance > 0.0F) {
+                    INFO("Percentage changed %f -> %f", previousPercentage, currentPercentage);
+                    for (int i = 0; i < list_getSize(thisPtr->percentageChangedCallbacks); i++) {
+                        const PercentageChangedCallback callback = list_getItem(thisPtr->percentageChangedCallbacks, i);
+                        if (callback != NULL) {
+                            callback(previousPercentage, currentPercentage);
+                        }
+                    }
+                }
+                thisPtr->task.voltageSampleChangedCount = 0;
+                thisPtr->task.previousBatteryInfo.voltage = thisPtr->task.currentBatteryInfo.voltage;
+                thisPtr->task.previousBatteryInfo.percentage = thisPtr->task.currentBatteryInfo.percentage;
+            } else {
+                thisPtr->task.voltageSampleChangedCount++;
+            }
+        }
+        if (previousIsCharging != currentIsCharging) {
+            INFO("IsCharging changed %s -> %s",
+                 previousIsCharging ? "true" : "false", currentIsCharging ? "true" : "false");
+            for (int i = 0; i < list_getSize(thisPtr->isChargingChangedCallbacks); i++) {
+                const IsChargingChangedCallback callback = list_getItem(thisPtr->isChargingChangedCallbacks, i);
+                if (callback != NULL) {
+                    callback(previousIsCharging, currentIsCharging);
+                }
+            }
+            thisPtr->task.previousBatteryInfo.isCharging = thisPtr->task.currentBatteryInfo.isCharging;
+        }
+        INFO("%u %.f%% %.fmV", esp_log_timestamp(), previousPercentage, previousVoltage);
+        vTaskDelay(pdMS_TO_TICKS(thisPtr->task.pollMillis));
+    }
+    vTaskDelete(thisPtr->task.handle);
+}
+
+public BatteryError battery_init() {
+    this.characteristics = new(esp_adc_cal_characteristics_t);
+    this.batteryChannel = ADC1_CHANNEL_7;
+    this.usbChannel = ADC1_CHANNEL_4;
+    this.batterySamplesCount = 128;
+    this.voltageReadingMarginOfError = 20.0F;
+    this.voltageSampleMarginOfError = 6;
+    this.percentageChangedCallbacks = list_create();
+    this.isChargingChangedCallbacks = list_create();
+    this.task.isRunning = true;
+    this.task.pollMillis = 2000;
+
+    battery_startBatteryTask();
 
     const adc_bits_width_t batteryBitsWidth = ADC_WIDTH_BIT_12;
     const adc_atten_t batteryAttenuation = ADC_ATTEN_DB_11;
@@ -159,8 +179,9 @@ public BatteryError battery_init() {
 
     adc1_config_width(batteryBitsWidth);
     adc1_config_channel_atten(this.batteryChannel, batteryAttenuation);
+    adc1_config_channel_atten(this.usbChannel, batteryAttenuation);
     esp_adc_cal_value_t calibrationUsed = esp_adc_cal_characterize(ADC_UNIT_1, batteryAttenuation, batteryBitsWidth,
-                                                                   defaultVRef, this.batteryCharacteristics);
+                                                                   defaultVRef, this.characteristics);
     const char *calibrationToString;
     switch (calibrationUsed) {
         case ESP_ADC_CAL_VAL_EFUSE_VREF:
@@ -189,24 +210,26 @@ public void battery_setSampleCount(const uint samplesCount) { this.batterySample
 public uint battery_getSampleCount() { return this.batterySamplesCount; }
 
 public float battery_getVoltage() {
-    return battery_getVoltageFromReading(battery_getRawReading(this.batterySamplesCount));
+    return battery_getVoltageFromReading(battery_getVoltageRawReading(this.batterySamplesCount),
+                                         battery_isCharging());
 }
 
 public float battery_getPercentage() {
-    return battery_getPercentageFromReading(battery_getRawReading(this.batterySamplesCount));
+    return battery_getPercentageFromReading(battery_getVoltageRawReading(this.batterySamplesCount),
+                                            battery_isCharging());
 }
 
 public bool battery_isCharging() {
-    // TODO: 10-Aug-2022 @basshelal: Implement!
-    return false;
+    const float usbVoltage = battery_getIsChargingVoltage(battery_getUsbRawReading(8));
+    return usbVoltage > 1000.0F;
 }
 
 public BatteryError battery_getInfo(BatteryInfo *batteryInfo) {
     requireNotNull(batteryInfo, BATTERY_ERROR_INVALID_PARAMETER, "batterInfo cannot be null");
-    const uint reading = battery_getRawReading(this.batterySamplesCount);
-    const float voltage = battery_getVoltageFromReading(reading);
-    const float percentage = battery_getPercentageFromReading(reading);
+    const uint reading = battery_getVoltageRawReading(this.batterySamplesCount);
     const bool isCharging = battery_isCharging();
+    const float voltage = battery_getVoltageFromReading(reading, isCharging);
+    const float percentage = battery_getPercentageFromReading(reading, isCharging);
     batteryInfo->isCharging = isCharging;
     batteryInfo->voltage = voltage;
     batteryInfo->percentage = percentage;
