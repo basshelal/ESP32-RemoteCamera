@@ -3,7 +3,7 @@
 #include "Wifi.h"
 #include "Webserver.h"
 #include "Battery.h"
-#include "services/DataStore.h"
+#include "ExternalStorage.h"
 #include "services/Camera.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -13,7 +13,7 @@ private void setup() {
     wifi_init();
     wifi_connect(WIFI_MODE_STA);
     webserver_init();
-    dataStore_init();
+    externalStorage_init();
     camera_init();
     battery_init();
     camera_read();

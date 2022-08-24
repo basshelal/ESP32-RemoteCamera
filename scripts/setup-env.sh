@@ -6,9 +6,7 @@ addPath() {
     export PATH="$*:$PATH"
 }
 
-addPath "/home/bassam/data/ESP32-IDF/xtensa-esp32-elf"
-export IDF_PATH="/home/bassam/data/ESP-IDF/esp-idf"
-export IDF_PYTHON_ENV_PATH="/usr/bin/python3.8"
+export IDF_PATH="$HOME/data/ESP-IDF/esp-idf"
 
 . $IDF_PATH/export.sh
 

@@ -7,6 +7,16 @@
 * Create dirs and files (using POSIX APIs)
 * Write (update and delete) dirs and files (using POSIX APIs)
 
+## Internal Storage
+* Split NVS from SPIFFS, NVS is too dissimilar to SPIFFS and External Storage
+  so it should be its own "Settings" component
+
+## Generic
+* Modify all functions to follow improved coding style, all functions return either an ErrorType
+  or `void` and nothing else, any returns are done through pointer parameters (stack pointers are 
+  the easy solution here) to allow for easy "exception handling" and even multiple return types
+* All modules with `init()` functions need to be made multi-call safe using a simple `bool` `isInitialized`
+
 ## Log
 * We should add an RGB LED capable of displaying multiple colors and effects to signal and detail
   errors and progress such as WiFi connecting, failed, awaiting setup etc but only for more critical

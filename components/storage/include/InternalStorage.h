@@ -21,6 +21,8 @@ extern StorageError internalStorage_init();
  * call only when you know a restart or shutdown will definitely happen and internal storage will no longer be used */
 extern StorageError internalStorage_destroy();
 
+/*============================= Key Value Pairs =============================*/
+
 /** Puts the value at key, updating it if it exists and creating it if it doesn't,
  * you can check a key's existence using \c internalStorage_hasKey */
 extern StorageError internalStorage_putString(const InternalStorageKey *key, const char *value);
@@ -40,6 +42,13 @@ extern StorageError internalStorage_getUInt32(const InternalStorageKey *key nonn
 extern StorageError internalStorage_deleteKey(const InternalStorageKey *key nonnull);
 
 extern bool internalStorage_hasKey(const InternalStorageKey *key nonnull);
+
+/*============================= Files =======================================*/
+
+//extern StorageError internalStorage_queryFileExists(const char *filePath,
+//                                                    bool *fileExists);
+
+//extern StorageError internalStorage_createFile(const char *filePath);
 
 extern StorageError internalStorage_openFile(const char *filePath nonnull,
                                              FILE **fileIn in_parameter,
