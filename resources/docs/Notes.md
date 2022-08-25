@@ -36,3 +36,10 @@ The benefits are currently small though so this is likely more costly than benef
 
 ## Voltage Divider
 Video was this https://www.youtube.com/watch?v=L321aqTvrLQ
+
+## Fixing SD Module Card Detect Pin Signal
+This pin is 0 when the SD card is NOT inserted but otherwise will just be floating
+which will sometimes be close to 0, so not reliable to use, we use a "Pull-up resistor"
+to fix this behavior to make it either 0 when card is NOT inserted and 1 otherwise,
+thus allowing for reliable GPIO usage, the explanation is here:
+https://learn.sparkfun.com/tutorials/pull-up-resistors/all

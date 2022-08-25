@@ -17,6 +17,7 @@
 #define AUTOMOUNT_TASK_PRIORITY 2U
 
 private struct {
+    bool isInitialized;
     sdmmc_host_t *sdmmcHost;
     // set to true from thread,
     // set to false from thread or externalStorage_unmountSDCard()
@@ -30,18 +31,17 @@ private struct {
     } task;
 } this;
 
-// TODO: 20-Aug-2022 @basshelal: Forever running thread/task to check if card has been inserted to automount,
-//  will need to check if card has unmounted/removed to change state
-//  this can be replaced with an interrupt that gets triggered when CardDetect pin changes
 private StorageError externalStorage_mountSDCard() {
     return STORAGE_ERROR_NONE;
 }
 
-private void externalStorage_taskFunction(void *arg);
+private void externalStorage_autoMountTaskFunction(void *arg);
 
 private void externalStorage_startAutoMountTask() {
+    this.task.isRunning = true;
+    this.task.pollMillis = 1000;
     xTaskCreate(
-            /*pvTaskCode=*/externalStorage_taskFunction,
+            /*pvTaskCode=*/externalStorage_autoMountTaskFunction,
             /*pcName=*/AUTOMOUNT_TASK_NAME,
             /*usStackDepth=*/AUTOMOUNT_TASK_STACK_SIZE,
             /*pvParameters=*/&this,
@@ -50,14 +50,27 @@ private void externalStorage_startAutoMountTask() {
     );
 }
 
-private void externalStorage_taskFunction(void *arg) {
+private void externalStorage_autoMountTaskFunction(void *arg) {
     typeof(this) *thisPtr = (typeof(this) *) arg;
     while (thisPtr->task.isRunning) {
-        // TODO: 22-Aug-2022 @basshelal: Start task, this changes the state to the following:
-        //  if (mounted && !hasSDCard) unmount()
-        //  if (!mounted && hasSDCard) mount()
-        //  if ((mounted && hasSDCard) || (!mounted && !hasSDCard)) OK
-        INFO("AutoMountTask run!");
+        const uint remaining = uxTaskGetStackHighWaterMark(thisPtr->task.handle);
+        if (remaining < 128) { // quit task if we run out of stack to avoid program crash
+            ERROR("Automount task ran out of stack, bytes remaining: %u", remaining);
+            // TODO: 11-Aug-2022 @basshelal: Notify the main task that we need to restart, we can't do it from here
+            break;
+        }
+        const bool oldHasSDCard = thisPtr->hasSDCard;
+        const bool newHasSDCard = externalStorage_hasSDCard();
+        if (oldHasSDCard != newHasSDCard) {
+            const bool isMounted = thisPtr->isMounted;
+            if (newHasSDCard && !isMounted) {
+                externalStorage_mountSDCard();
+            } else if (!newHasSDCard && isMounted) {
+                externalStorage_unmountSDCard();
+            }
+            thisPtr->hasSDCard = newHasSDCard;
+            INFO("SD CARD: %s", boolToString(newHasSDCard));
+        }
         vTaskDelay(pdMS_TO_TICKS(thisPtr->task.pollMillis));
     }
     vTaskDelete(thisPtr->task.handle);
@@ -65,13 +78,14 @@ private void externalStorage_taskFunction(void *arg) {
 
 public StorageError externalStorage_init() {
     esp_err_t err;
+    this.hasSDCard = externalStorage_hasSDCard();
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
             .format_if_mount_failed = false,
             .max_files = 5,
     };
 
     sdmmc_card_t *card;
-    const char mount_point[] = "/sdcard";
+    const char *mountPoint = SD_CARD_PATH;
 
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
 
@@ -90,21 +104,33 @@ public StorageError externalStorage_init() {
     slot_config.gpio_cs = 15;
     slot_config.host_id = host.slot;
 
-    err = esp_vfs_fat_sdspi_mount(mount_point, &host, &slot_config, &mount_config, &card);
+    err = esp_vfs_fat_sdspi_mount(mountPoint, &host, &slot_config, &mount_config, &card);
+
+    if (err == ESP_OK) {
+        this.isMounted = true;
+    }
 
     sdmmc_card_print_info(stdout, card);
 
-    DIR *dir = opendir(mount_point);
+    DIR *dir = opendir(mountPoint);
 
     if (dir != NULL) {
         struct dirent *dirent;
         while ((dirent = readdir(dir))) {
             printf("entry: %s\n", dirent->d_name);
         }
+        closedir(dir);
     }
 
-    closedir(dir);
+    gpio_config_t gpioConfig = {
+            .pin_bit_mask = GPIO_SEL_36,
+            .mode = GPIO_MODE_INPUT,
+            .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&gpioConfig);
+    externalStorage_startAutoMountTask();
 
+    this.isInitialized = true;
     return STORAGE_ERROR_NONE;
 }
 
@@ -117,7 +143,9 @@ public StorageError externalStorage_unmountSDCard() {
 }
 
 public bool externalStorage_hasSDCard() {
-    return STORAGE_ERROR_NONE;
+    // card detect pin is 1 when card is in and 0 when not in
+    const bool cardDetectPinLevel = gpio_get_level(GPIO_NUM_36);
+    return cardDetectPinLevel;
 }
 
 public StorageError externalStorage_getSDCardInfo(SDCardInfo *sdCardInfo) {
