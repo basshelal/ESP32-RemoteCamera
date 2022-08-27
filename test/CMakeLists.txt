@@ -16,5 +16,5 @@ project(ESP32-RemoteCamera_test)
 
 add_custom_command(TARGET app
         POST_BUILD
-        COMMAND npm run build
+        COMMAND npm run fastbuild
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/../webclient)

@@ -4,12 +4,15 @@
 #include <math.h>
 #include "esp_adc_cal.h"
 #include "Logger.h"
+#include "TaskWatcher.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 #define BATTERY_TASK_NAME "batteryTask"
 #define BATTERY_TASK_STACK_SIZE 2200
+#define BATTERY_TASK_STACK_MIN BATTERY_TASK_STACK_SIZE * 0.05
 #define BATTERY_TASK_PRIORITY tskIDLE_PRIORITY
+#define BATTERY_TASK_POLL_MILLIS 2000
 #define BATTERY_MIN_VOLTAGE 2750.0F
 #define BATTERY_MAX_VOLTAGE 4200.0F
 
@@ -27,7 +30,6 @@ private struct {
     struct {
         TaskHandle_t handle;
         bool isRunning;
-        uint pollMillis;
         uint voltageSampleChangedCount; // to check against voltageSampleMarginOfError
         BatteryInfo previousBatteryInfo;
         BatteryInfo currentBatteryInfo;
@@ -86,6 +88,7 @@ private float battery_getPercentageFromReading(const uint rawReading, const bool
 private void battery_taskFunction(void *arg);
 
 private void battery_startBatteryTask() {
+    this.task.isRunning = true;
     xTaskCreate(
             /*pvTaskCode=*/battery_taskFunction,
             /*pcName=*/BATTERY_TASK_NAME,
@@ -97,14 +100,16 @@ private void battery_startBatteryTask() {
 }
 
 private void battery_taskFunction(void *arg) {
+    taskWatcher_notifyTaskStarted(BATTERY_TASK_NAME);
     typeof(this) *thisPtr = (typeof(this) *) arg;
     // initialize previous info to avoid a change event on first run because previous was all 0s
     battery_getInfo(&thisPtr->task.previousBatteryInfo);
+    uint remaining = 0;
     while (thisPtr->task.isRunning) {
-        const uint remaining = uxTaskGetStackHighWaterMark(thisPtr->task.handle);
-        if (remaining < 128) { // quit task if we run out of stack to avoid program crash
+        remaining = uxTaskGetStackHighWaterMark(thisPtr->task.handle);
+        if (remaining < BATTERY_TASK_STACK_MIN) { // quit task if we run out of stack to avoid program crash
             ERROR("Battery task ran out of stack, bytes remaining: %u", remaining);
-            // TODO: 11-Aug-2022 @basshelal: Notify the main task that we need to restart, we can't do it from here
+            this.task.isRunning = false;
             break;
         }
         battery_getInfo(&thisPtr->task.currentBatteryInfo);
@@ -146,8 +151,12 @@ private void battery_taskFunction(void *arg) {
             thisPtr->task.previousBatteryInfo.isCharging = thisPtr->task.currentBatteryInfo.isCharging;
         }
         INFO("%u %.f%% %.fmV", esp_log_timestamp(), previousPercentage, previousVoltage);
-        vTaskDelay(pdMS_TO_TICKS(thisPtr->task.pollMillis));
+        vTaskDelay(pdMS_TO_TICKS(BATTERY_TASK_POLL_MILLIS));
     }
+    taskWatcher_notifyTaskStopped(
+            /*taskName=*/BATTERY_TASK_NAME,
+            /*shouldRestart=*/true,
+            /*remainingStackBytes=*/remaining);
     vTaskDelete(thisPtr->task.handle);
 }
 
@@ -161,8 +170,13 @@ public BatteryError battery_init() {
     this.percentageChangedCallbacks = list_create();
     this.isChargingChangedCallbacks = list_create();
     this.task.isRunning = true;
-    this.task.pollMillis = 2000;
 
+    TaskInfo taskInfo = {
+            .name = BATTERY_TASK_NAME,
+            .stackBytes = BATTERY_TASK_STACK_SIZE,
+            .startFunction = battery_startBatteryTask
+    };
+    taskWatcher_registerTask(&taskInfo);
     battery_startBatteryTask();
 
     const adc_bits_width_t batteryBitsWidth = ADC_WIDTH_BIT_12;

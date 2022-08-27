@@ -11,7 +11,7 @@ idf_build_set_property(COMPILE_OPTIONS "${MY_COMPILE_OPTIONS}" APPEND)
 
 add_custom_command(TARGET app
         POST_BUILD
-        COMMAND npm run build
+        COMMAND npm run fastbuild
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/webclient)
 
 add_custom_command(TARGET app

@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "description": "Client for ESP32 Remote Camera",
   "scripts": {
+    "fastbuild": "build-if-changed",
     "build": "npm run clean && webpack --config=webpack/prod.js && ../scripts/sizes.sh",
     "clean": "rimraf ../webpages/*",
     "dev": "webpack serve --config=webpack/dev.js",
@@ -10,6 +11,7 @@
   },
   "devDependencies": {
     "@types/jest": "^28.1.5",
+    "build-if-changed": "^1.5.5",
     "classnames": "^2.3.1",
     "copy-webpack-plugin": "^11.0.0",
     "css-loader": "^6.7.1",
