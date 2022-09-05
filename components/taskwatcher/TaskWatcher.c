@@ -1,7 +1,7 @@
 #include "TaskWatcher.h"
 #include "Utils.h"
 
-#ifdef CONFIG_USE_TASK_WATCHER
+#if CONFIG_USE_TASK_WATCHER
 
 #include <string.h>
 #include "List.h"

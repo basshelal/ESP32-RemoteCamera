@@ -4,22 +4,18 @@
 #include <stddef.h>
 
 typedef struct StorageInfo {
-
+    char *mountPoint;
+    uint64_t totalBytes;
+    uint64_t usedBytes;
+    uint64_t freeBytes;
 } StorageInfo;
 
-typedef struct SDCardInfo {
-    char *name;
-    uint32_t speed;
-    size_t capacity;
-    size_t size;
-} SDCardInfo;
-
 typedef struct FileInfo {
-    size_t size;
+    uint64_t sizeBytes;
 } FileInfo;
 
 typedef struct DirInfo {
-
+    uint64_t sizeBytes;
 } DirInfo;
 
 #endif //ESP32_REMOTECAMERA_INFO_H

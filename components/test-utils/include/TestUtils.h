@@ -12,9 +12,6 @@ buffer;})
 __attribute__((unused))        \
 static void UNITY_TEST_UID(disabled_test_func_) (void)
 
-#define BEFORE_EACH() void setUp(void)
-#define AFTER_EACH() void tearDown(void)
-
 #define ASSERT(condition, message, ...) \
 do{UNITY_TEST_ASSERT(condition, __LINE__, MESSAGE(message, ##__VA_ARGS__));}while(0)
 
@@ -33,13 +30,34 @@ do{UNITY_TEST_ASSERT_EQUAL_INT(expected, actual, __LINE__, MESSAGE(message, ##__
 #define ASSERT_UINT_EQUAL(expected, actual, message, ...) \
 do{UNITY_TEST_ASSERT_EQUAL_UINT(expected, actual, __LINE__, MESSAGE(message, ##__VA_ARGS__));}while(0)
 
-#define ASSERT_INT_GREATER_THAN(threshold, actual, message, ...) \
-do{UNITY_TEST_ASSERT_GREATER_THAN_INT(threshold, actual, __LINE__, MESSAGE(message, ##__VA_ARGS__));}while(0)
-
 #define ASSERT_STRING_EQUAL(expected, actual, message, ...) \
 do{UNITY_TEST_ASSERT_EQUAL_STRING(expected, actual, __LINE__, MESSAGE(message, ##__VA_ARGS__));}while(0)
 
-#define ASSERT_MEMORY_EQUAL(expected, actual, len, message, ...) \
-do{UNITY_TEST_ASSERT_EQUAL_MEMORY(expected, actual, len, __LINE__, MESSAGE(message, ##__VA_ARGS__));}while(0)
+#define beginTestFile(fileName) \
+__attribute__((weak)) void beforeEach##__FILENAME__();\
+__attribute__((weak)) void afterEach##__FILENAME__();
+
+#define beforeEach() \
+void beforeEach##__FILENAME__()
+
+#define afterEach() \
+void afterEach##__FILENAME__()
+
+#define beginTest() \
+do {if(beforeEach##__FILENAME__){\
+beforeEach##__FILENAME__(); \
+}} while(0)
+
+#define endTest() \
+do {if(afterEach##__FILENAME__){\
+afterEach##__FILENAME__(); \
+}} while(0)
+
+#define endTestFile
+
+#define testCase(name) TEST_CASE(name, "")
+#define xtestCase(name) XTEST_CASE(name, "")
+
+#define ignoreTest() TEST_IGNORE()
 
 #endif //ESP32_REMOTECAMERA_TEST_TESTUTILS_H

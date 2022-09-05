@@ -5,7 +5,7 @@ file(GLOB TEST_FILES
 idf_component_register(
         SRCS ${TEST_FILES}
         INCLUDE_DIRS "."
-        PRIV_REQUIRES cmock unity common test-utils
+        PRIV_REQUIRES cmock unity common test-utils logger
 )
 
 # Create a SPIFFS image from the contents of the 'webpages' directory

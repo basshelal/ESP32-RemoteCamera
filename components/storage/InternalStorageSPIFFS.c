@@ -55,7 +55,7 @@ public StorageError internalStorage_openFile(const char *filePath nonnull,
     if (*fileIn == NULL) {
         err = errno;
         if (err == ENOENT) {
-            throw(STORAGE_ERROR_FILE_NOT_FOUND,
+            throw(STORAGE_ERROR_NOT_FOUND,
                   "fopen() returned ENOENT, file in path: %s was likely not found", path);
         } else {
             throw(STORAGE_ERROR_GENERIC_FAILURE, "fopen() returned error %i: %s", err, strerror(err));
@@ -117,7 +117,7 @@ public StorageError internalStorage_readFile(const char *filePath nonnull,
     if (file == NULL) {
         err = errno;
         if (err == ENOENT) {
-            throw(STORAGE_ERROR_FILE_NOT_FOUND,
+            throw(STORAGE_ERROR_NOT_FOUND,
                   "fopen() returned ENOENT, file in path: %s was likely not found", path);
         } else {
             throw(STORAGE_ERROR_GENERIC_FAILURE, "fopen() returned error %i: %s", err, strerror(err));
@@ -156,7 +156,7 @@ public StorageError internalStorage_writeFile(const char *filePath nonnull,
     if (file == NULL) {
         err = errno;
         if (err == ENOENT) {
-            throw(STORAGE_ERROR_FILE_NOT_FOUND,
+            throw(STORAGE_ERROR_NOT_FOUND,
                   "fopen() returned ENOENT, file in path: %s was likely not found", path);
         } else {
             throw(STORAGE_ERROR_GENERIC_FAILURE, "fopen() returned error %i: %s", err, strerror(err));
@@ -217,7 +217,7 @@ public StorageError internalStorage_deleteFile(const char *filePath nonnull) {
     }
     err = remove(path);
     if (err == ENOENT) {
-        throw(STORAGE_ERROR_FILE_NOT_FOUND, "File with path: %s does not exist", path);
+        throw(STORAGE_ERROR_NOT_FOUND, "File with path: %s does not exist", path);
     } else if (err != 0) {
         throw(STORAGE_ERROR_GENERIC_FAILURE, "remove() for file path: %s returned error %i: %s",
               path, err, strerror(err));

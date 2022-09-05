@@ -1,26 +1,32 @@
 #ifndef ESP32_REMOTECAMERA_STORAGEERROR_H
 #define ESP32_REMOTECAMERA_STORAGEERROR_H
 
+#include "Constants.h"
+
 typedef enum StorageError {
     STORAGE_ERROR_NONE = 0,
     STORAGE_ERROR_INVALID_PARAMETER,
+    STORAGE_ERROR_NOT_FOUND,
     STORAGE_ERROR_PARTITION_NOT_FOUND,
     STORAGE_ERROR_KEY_NOT_FOUND,
     STORAGE_ERROR_INVALID_KEY,
     STORAGE_ERROR_INVALID_VALUE,
     STORAGE_ERROR_NVS_CLOSED,
     STORAGE_ERROR_NOT_ENOUGH_SPACE,
-    STORAGE_ERROR_FILE_NOT_FOUND,
     STORAGE_ERROR_INVALID_LENGTH,
+    STORAGE_ERROR_ALREADY_EXISTS,
     STORAGE_ERROR_GENERIC_FAILURE = -1,
 } StorageError;
 
-public inline const char *storageError_toString(const StorageError error) {
+inline const char *storageError_toString(const StorageError error) {
+#if CONFIG_USE_ERROR_TO_STRING
     switch (error) {
         case STORAGE_ERROR_NONE:
             return "STORAGE_ERROR_NONE";
         case STORAGE_ERROR_INVALID_PARAMETER:
             return "STORAGE_ERROR_INVALID_PARAMETER";
+        case STORAGE_ERROR_NOT_FOUND:
+            return "STORAGE_ERROR_NOT_FOUND";
         case STORAGE_ERROR_PARTITION_NOT_FOUND:
             return "STORAGE_ERROR_PARTITION_NOT_FOUND";
         case STORAGE_ERROR_KEY_NOT_FOUND:
@@ -33,13 +39,14 @@ public inline const char *storageError_toString(const StorageError error) {
             return "STORAGE_ERROR_NVS_CLOSED";
         case STORAGE_ERROR_NOT_ENOUGH_SPACE:
             return "STORAGE_ERROR_NOT_ENOUGH_SPACE";
-        case STORAGE_ERROR_FILE_NOT_FOUND:
-            return "STORAGE_ERROR_FILE_NOT_FOUND";
         case STORAGE_ERROR_GENERIC_FAILURE:
             return "STORAGE_ERROR_GENERIC_FAILURE";
         default:
             return "UNKNOWN ERROR";
     }
+#else
+    return "";
+#endif // CONFIG_USE_ERROR_TO_STRING
 }
 
 #endif //ESP32_REMOTECAMERA_STORAGEERROR_H

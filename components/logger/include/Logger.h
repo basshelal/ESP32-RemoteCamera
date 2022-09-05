@@ -46,6 +46,13 @@ __FILENAME__, "%s:%d "message, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
 ERROR(message, ##__VA_ARGS__);   \
 return error
 
+#define throwIfError(func, message, ...) \
+do{                                      \
+int error = func;\
+if (error != 0) {                                     \
+throw(error, message, ##__VA_ARGS__);                \
+}}while(0)
+
 #define require(condition, error, message, ...) \
 do{                                                  \
 if (!(condition)) {                                  \

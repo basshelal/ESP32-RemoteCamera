@@ -18,7 +18,9 @@ private void setup() {
     wifi_init();
     wifi_connect(WIFI_MODE_STA);
     webserver_init();
-    externalStorage_init();
+    ExternalStorageOptions externalStorageOptions = EXTERNAL_STORAGE_DEFAULT_OPTIONS;
+    externalStorageOptions.startAutoMountTask = true;
+    externalStorage_init(&externalStorageOptions);
     camera_init();
     battery_init();
     camera_read();
