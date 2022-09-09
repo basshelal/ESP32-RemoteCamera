@@ -59,12 +59,10 @@ typedef struct ListOptions {
 
 #define LIST_DEFAULT_OPTIONS \
 {.capacity=LIST_DEFAULT_INITIAL_CAPACITY,\
- .isGrowable=true,.growthFactor=LIST_GROWTH_FACTOR,\
+ .isGrowable=true,           \
+ .growthFactor=LIST_GROWTH_FACTOR,\
  .errorCallback=NULL\
 }
-
-/** Create a new ListOptions with default values, this performs a call to malloc, must be freed when done */
-extern ListOptions *list_defaultListOptions();
 
 /** Create and return a list with default options from list_defaultListOptions() */
 extern List *list_create();

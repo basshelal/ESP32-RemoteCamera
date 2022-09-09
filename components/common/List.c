@@ -46,15 +46,6 @@ private void list_shiftLeft(ListData *this, const index_t startIndex) {
     }
 }
 
-public ListOptions *list_defaultListOptions() {
-    ListOptions *options = new(ListOptions);
-    options->capacity = LIST_DEFAULT_INITIAL_CAPACITY;
-    options->isGrowable = true;
-    options->growthFactor = LIST_GROWTH_FACTOR;
-    options->errorCallback = NULL;
-    return options;
-}
-
 public List *list_create() {
     return list_createWithOptions(NULL);
 }

@@ -1,6 +1,7 @@
 #ifndef ESP32_REMOTECAMERA_LOGGER_H
 #define ESP32_REMOTECAMERA_LOGGER_H
 
+#include "Constants.h"
 #include "Utils.h"
 #include "List.h"
 #include <esp_log.h>
@@ -37,10 +38,29 @@ LOG_TAG, "%s:%d "message, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
 __FILENAME__, "%s:%d "message, __PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__
 #endif
 
+#if CONFIG_LOGGER_LOG_LEVEL >= CONFIG_LOG_LEVEL_ERROR
 #define ERROR(message, ...) log_vargs(LOG_LEVEL_ERROR, LOG_TEMPLATE(message, ##__VA_ARGS__))
+#else
+#define ERROR(message, ...) EMPTY_MACRO_STATEMENT
+#endif
+
+#if CONFIG_LOGGER_LOG_LEVEL >= CONFIG_LOG_LEVEL_WARN
 #define WARN(message, ...) log_vargs(LOG_LEVEL_WARN, LOG_TEMPLATE(message, ##__VA_ARGS__))
+#else
+#define WARN(message, ...) EMPTY_MACRO_STATEMENT
+#endif
+
+#if CONFIG_LOGGER_LOG_LEVEL >= CONFIG_LOG_LEVEL_INFO
 #define INFO(message, ...) log_vargs(LOG_LEVEL_INFO, LOG_TEMPLATE(message, ##__VA_ARGS__))
+#else
+#define INFO(message, ...) EMPTY_MACRO_STATEMENT
+#endif
+
+#if CONFIG_LOGGER_LOG_LEVEL >= CONFIG_LOG_LEVEL_VERBOSE
 #define VERBOSE(message, ...) log_vargs(LOG_LEVEL_VERBOSE, LOG_TEMPLATE(message, ##__VA_ARGS__))
+#else
+#define VERBOSE(message, ...) EMPTY_MACRO_STATEMENT
+#endif
 
 #define throw(error, message, ...) \
 ERROR(message, ##__VA_ARGS__);   \

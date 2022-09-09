@@ -50,7 +50,7 @@ private inline void fillTestDir(const char *dirName, const uint fileCount, const
     }
     for (int i = 0; i < dirCount; i++) {
         sprintf(buffer, "%s/%s%i", dirName, "testDir", i);
-        externalStorage_createFile(buffer);
+        externalStorage_createDir(buffer);
     }
     size_t entryCount;
     externalStorage_readDir(dirName, NULL, &entryCount);
@@ -119,6 +119,8 @@ testCase("dir create ,query, move, delete") {
 }
 
 testCase("read dir") {
+
+    fillTestDir(testDirName, 5, 5);
 
     size_t entryCount = SIZE_MAX;
     assertOK(externalStorage_readDir(testDirName, NULL, &entryCount));

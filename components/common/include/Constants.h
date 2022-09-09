@@ -3,6 +3,14 @@
 
 // TODO: 26-Aug-2022 @basshelal: Move all pins as #define constants here
 
+#define CONFIG_LOG_LEVEL_NONE          0
+#define CONFIG_LOG_LEVEL_ERROR         1
+#define CONFIG_LOG_LEVEL_WARN          2
+#define CONFIG_LOG_LEVEL_INFO          3
+#define CONFIG_LOG_LEVEL_VERBOSE       4
+
+#define CONFIG_LOGGER_LOG_LEVEL CONFIG_LOG_LEVEL_VERBOSE
+
 // 0 to disable TaskWatcher, otherwise it is enabled
 #define CONFIG_USE_TASK_WATCHER 1
 

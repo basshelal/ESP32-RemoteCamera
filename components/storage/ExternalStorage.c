@@ -15,7 +15,8 @@
 #include "Logger.h"
 #include "StorageCommon.h"
 
-#define SD_CARD_PATH "/sd0"
+// TODO: 08-Sep-2022 @basshelal: Should we auto add the prefix? Or force it? Or smart check? Be consistent!
+#define SD_CARD_PATH "/sd"
 #define AUTOMOUNT_TASK_NAME "automountTask"
 #define AUTOMOUNT_TASK_STACK_SIZE 2400
 #define AUTOMOUNT_TASK_STACK_MIN AUTOMOUNT_TASK_STACK_SIZE * 0.05
@@ -37,7 +38,14 @@ private struct {
 
 #define requireParamNotNull(element, elementToString) \
 requireNotNull(element, STORAGE_ERROR_INVALID_PARAMETER, elementToString" cannot be NULL")
-#define getPath(buffer, path) sprintf(buffer, "%s/%s", SD_CARD_PATH, path)
+
+#define requirePathLengthUnderLimit(path) \
+size_t _length = strlen(path); \
+require(_length <= EXTERNAL_STORAGE_MAX_PATH_LENGTH, STORAGE_ERROR_INVALID_LENGTH, \
+        "path length cannot exceed limit of %u, was %u", EXTERNAL_STORAGE_MAX_PATH_LENGTH, _length)
+
+#define getPrefixedPath(buffer, path) \
+sprintf(buffer, "%s/%s", SD_CARD_PATH, path)
 
 private StorageError externalStorage_mountSDCard() {
     const atomic_bool isMounted = atomic_load(&this.isMounted);
@@ -113,21 +121,38 @@ private void externalStorage_autoMountTaskFunction(void *arg) {
     thisPtr->task.handle = NULL;
 }
 
+private StorageError externalStorage_readDirPrivate(const char *dirPath,
+                                                    char **dirEntries,
+                                                    size_t *entryCount,
+                                                    bool prefix);
+
+// TODO: 08-Sep-2022 @basshelal: Consider converting this function to using an iterative
+//  depth first search in order to avoid stack overflows when traversing deep trees
 private void externalStorage_deleteDirContents(const char *dirPath, const DIR *dir) {
     struct dirent *entry;
-    char tempPathBuffer[FF_MAX_LFN * 2];
+    char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
     while ((entry = readdir(dir))) {
-        sprintf(tempPathBuffer, "%s/%s", dirPath, entry->d_name);
+        sprintf(pathBuffer, "%s/%s", dirPath, entry->d_name);
+        printf("entry: %s\n", pathBuffer);
         if (entry->d_type == DT_REG) { // file
-            remove(tempPathBuffer);
+            remove(pathBuffer);
         } else if (entry->d_type == DT_DIR) { // dir
-            DIR *innerDir = opendir(tempPathBuffer);
+            DIR *innerDir = opendir(pathBuffer);
             if (innerDir != NULL) {
-                externalStorage_deleteDirContents(tempPathBuffer, innerDir);
+                size_t entryCount;
+                StorageError err = externalStorage_readDirPrivate(pathBuffer, NULL, &entryCount, /*prefix=*/false);
+                if (err == STORAGE_ERROR_NONE && entryCount == 0) { // dir is empty
+                    rmdir(pathBuffer);
+                } else if (entryCount > 0) { // dir has entries, recursively delete them
+                    externalStorage_deleteDirContents(pathBuffer, innerDir);
+                }
+                closedir(innerDir);
             }
         }
     }
 }
+
+/*============================= Public API ==================================*/
 
 public StorageError externalStorage_init(ExternalStorageOptions *externalStorageOptions) {
     if (this.isInitialized) {
@@ -249,8 +274,9 @@ public StorageError externalStorage_getStorageInfo(StorageInfo *storageInfo) {
 public StorageError externalStorage_queryDirExists(const char *dirPath, bool *dirExists) {
     requireParamNotNull(dirPath, "dirPath");
     requireParamNotNull(dirExists, "dirExists");
-    char pathBuffer[FF_MAX_LFN];
-    getPath(pathBuffer, dirPath);
+    requirePathLengthUnderLimit(dirPath);
+    char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(pathBuffer, dirPath);
     DIR *dir = opendir(pathBuffer);
     if (dir == NULL) {
         int err = errno;
@@ -269,8 +295,8 @@ public StorageError externalStorage_queryDirExists(const char *dirPath, bool *di
 public StorageError externalStorage_queryDirInfo(const char *dirPath, DirInfo *dirInfo) {
     requireParamNotNull(dirPath, "dirPath");
     requireParamNotNull(dirInfo, "dirInfo");
-    char pathBuffer[FF_MAX_LFN];
-    getPath(pathBuffer, dirPath);
+    char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(pathBuffer, dirPath);
     struct stat statResult;
     if (stat(pathBuffer, &statResult) != 0) {
         int err = errno;
@@ -287,8 +313,8 @@ public StorageError externalStorage_queryDirInfo(const char *dirPath, DirInfo *d
 
 public StorageError externalStorage_createDir(const char *dirPath) {
     requireParamNotNull(dirPath, "dirPath");
-    char pathBuffer[FF_MAX_LFN];
-    getPath(pathBuffer, dirPath);
+    char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(pathBuffer, dirPath);
 
     if (mkdir(pathBuffer, ACCESSPERMS) != 0) {
         int err = errno;
@@ -298,17 +324,21 @@ public StorageError externalStorage_createDir(const char *dirPath) {
     return STORAGE_ERROR_NONE;
 }
 
-public StorageError externalStorage_readDir(const char *dirPath, char **dirEntries, size_t *entryCount) {
-    requireParamNotNull(dirPath, "dirPath");
-    requireParamNotNull(entryCount, "entryCount");
-
+private StorageError externalStorage_readDirPrivate(const char *dirPath,
+                                                    char **dirEntries,
+                                                    size_t *entryCount,
+                                                    bool prefix) {
     bool fillEntries = true;
     if (dirEntries == NULL) { // user only wants count and not to fill array
         fillEntries = false;
     }
 
-    char pathBuffer[FF_MAX_LFN];
-    getPath(pathBuffer, dirPath);
+    char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    if (prefix) {
+        getPrefixedPath(pathBuffer, dirPath);
+    } else {
+        sprintf(pathBuffer, "%s", dirPath);
+    }
     DIR *dir = opendir(pathBuffer);
     if (dir == NULL) {
         int err = errno;
@@ -333,13 +363,20 @@ public StorageError externalStorage_readDir(const char *dirPath, char **dirEntri
     return STORAGE_ERROR_NONE;
 }
 
+public StorageError externalStorage_readDir(const char *dirPath, char **dirEntries, size_t *entryCount) {
+    requireParamNotNull(dirPath, "dirPath");
+    requireParamNotNull(entryCount, "entryCount");
+
+    return externalStorage_readDirPrivate(dirPath, dirEntries, entryCount, /*prefix=*/true);
+}
+
 public StorageError externalStorage_moveDir(const char *dirPath, const char *newDirPath) {
     requireParamNotNull(dirPath, "dirPath");
     requireParamNotNull(newDirPath, "newDirPath");
-    char oldPathBuffer[FF_MAX_LFN];
-    getPath(oldPathBuffer, dirPath);
-    char newPathBuffer[FF_MAX_LFN];
-    getPath(newPathBuffer, newDirPath);
+    char oldPathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(oldPathBuffer, dirPath);
+    char newPathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(newPathBuffer, newDirPath);
     if (rename(oldPathBuffer, newPathBuffer) != 0) {
         int err = errno;
         if (err == ENOENT) {
@@ -353,8 +390,8 @@ public StorageError externalStorage_moveDir(const char *dirPath, const char *new
 
 public StorageError externalStorage_deleteDir(const char *dirPath) {
     requireParamNotNull(dirPath, "dirPath");
-    char pathBuffer[FF_MAX_LFN];
-    getPath(pathBuffer, dirPath);
+    char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(pathBuffer, dirPath);
     DIR *dir = opendir(pathBuffer);
     if (dir == NULL) {
         int err = errno;
@@ -365,15 +402,85 @@ public StorageError externalStorage_deleteDir(const char *dirPath) {
         }
     }
     externalStorage_deleteDirContents(pathBuffer, dir);
+    rmdir(pathBuffer);
+    closedir(dir);
     return STORAGE_ERROR_NONE;
 }
 
 /*============================= Files =======================================*/
 
+public StorageError externalStorage_queryFileExists(const char *filePath,
+                                                    bool *fileExists) {
+    requireParamNotNull(filePath, "dirPath");
+    requireParamNotNull(fileExists, "fileExists");
+    char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(pathBuffer, filePath);
+    if (access(pathBuffer, F_OK) == 0) {
+        *fileExists = true;
+    } else {
+        int err = errno;
+        if (errno == ENOENT) {
+            *fileExists = false;
+        } else {
+            throw(STORAGE_ERROR_GENERIC_FAILURE, "access() returned %i: %s", err, strerror(err));
+        }
+    }
+    return STORAGE_ERROR_NONE;
+}
+
+public StorageError externalStorage_queryFileInfo(const char *filePath, FileInfo *fileInfo) {
+    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+}
+
+public StorageError externalStorage_createFile(const char *filePath) {
+    requireParamNotNull(filePath, "dirPath");
+    char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(pathBuffer, filePath);
+    bool fileExists;
+    externalStorage_queryFileExists(filePath, &fileExists);
+    if (!fileExists) {
+        FILE *file = fopen(filePath, "w");
+        if (file != NULL) {
+            fclose(file);
+        }
+    }
+    return STORAGE_ERROR_NONE;
+}
+
+public StorageError externalStorage_openFile(const char *filePath,
+                                             FILE **fileIn,
+                                             const FileMode fileMode) {
+    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+}
+
+public StorageError externalStorage_closeFile(const FILE *fileIn) {
+    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+}
+
+public StorageError externalStorage_readFile(const FILE *file,
+                                             size_t startPosition,
+                                             void *bufferIn,
+                                             const uint bufferLength,
+                                             uint *bytesRead) {
+    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+}
+
+public StorageError externalStorage_writeFile(const char *filePath,
+                                              size_t startPosition,
+                                              const void *buffer,
+                                              const uint bufferLength,
+                                              uint *bytesWritten) {
+    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+}
+
+public StorageError externalStorage_moveFile(const char *filePath, const char *newFilePath) {
+    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+}
+
 public StorageError externalStorage_deleteFile(const char *filePath) {
     requireParamNotNull(filePath, "filePath");
-    char pathBuffer[FF_MAX_LFN];
-    getPath(pathBuffer, filePath);
+    char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(pathBuffer, filePath);
     if (remove(pathBuffer) != 0) {
         int err = errno;
         if (err == ENOENT) {

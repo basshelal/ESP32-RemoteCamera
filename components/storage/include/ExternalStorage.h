@@ -8,6 +8,12 @@
 #include "Info.h"
 #include <stdio.h>
 #include <stdbool.h>
+#include <ff.h>
+
+/** Max length a file or dir name can be */
+#define EXTERNAL_STORAGE_MAX_FILE_LENGTH FF_MAX_LFN
+/** Max length a full path can be including dots, slashes, extensions and the mount prefix */
+#define EXTERNAL_STORAGE_MAX_PATH_LENGTH 260
 
 typedef struct {
     bool startAutoMountTask;

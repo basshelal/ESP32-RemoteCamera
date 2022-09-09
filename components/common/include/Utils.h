@@ -11,6 +11,8 @@
 #define returns_nonnull attr(__returns_nonnull__)
 #define in_parameter attr()
 
+#define EMPTY_MACRO_STATEMENT do{}while(0)
+
 #define TODO(reason) __assert_func(__FILENAME__, __LINE__, NULL, reason)
 
 typedef unsigned char uchar;
