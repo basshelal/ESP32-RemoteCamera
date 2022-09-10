@@ -15,7 +15,6 @@
 #include "Logger.h"
 #include "StorageCommon.h"
 
-// TODO: 08-Sep-2022 @basshelal: Should we auto add the prefix? Or force it? Or smart check? Be consistent!
 #define SD_CARD_PATH "/sd"
 #define AUTOMOUNT_TASK_NAME "automountTask"
 #define AUTOMOUNT_TASK_STACK_SIZE 2400
@@ -121,35 +120,57 @@ private void externalStorage_autoMountTaskFunction(void *arg) {
     thisPtr->task.handle = NULL;
 }
 
-private StorageError externalStorage_readDirPrivate(const char *dirPath,
-                                                    char **dirEntries,
-                                                    size_t *entryCount,
-                                                    bool prefix);
-
-// TODO: 08-Sep-2022 @basshelal: Consider converting this function to using an iterative
-//  depth first search in order to avoid stack overflows when traversing deep trees
-private void externalStorage_deleteDirContents(const char *dirPath, const DIR *dir) {
-    struct dirent *entry;
+private StorageError externalStorage_deleteDirAndContents(const char *dirPath) {
+    List *stack = list_create();
+    List *dirsToDelete = list_create();
     char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
-    while ((entry = readdir(dir))) {
-        sprintf(pathBuffer, "%s/%s", dirPath, entry->d_name);
-        printf("entry: %s\n", pathBuffer);
-        if (entry->d_type == DT_REG) { // file
-            remove(pathBuffer);
-        } else if (entry->d_type == DT_DIR) { // dir
-            DIR *innerDir = opendir(pathBuffer);
-            if (innerDir != NULL) {
-                size_t entryCount;
-                StorageError err = externalStorage_readDirPrivate(pathBuffer, NULL, &entryCount, /*prefix=*/false);
-                if (err == STORAGE_ERROR_NONE && entryCount == 0) { // dir is empty
-                    rmdir(pathBuffer);
-                } else if (entryCount > 0) { // dir has entries, recursively delete them
-                    externalStorage_deleteDirContents(pathBuffer, innerDir);
-                }
-                closedir(innerDir);
+    struct dirent *entry;
+
+    // This algorithm is essentially an iterative Depth First Search using a stack (List made to behave like a stack)
+    //  we delete files as we find them, and add dirs in the order which we encounter them which will be from
+    //  highest to lowest in the chain, meaning that list reversed will always be safe to delete because the dirs
+    //  will be empty
+    list_addItem(stack, dirPath); // begin with root dir
+    while (!list_isEmpty(stack)) {
+        const index_t stackLastIndex = list_getSize(stack) - 1;
+
+        // all "processing" is done on the popped dir which is like the "current" dir
+        const char *poppedDir = list_getItem(stack, stackLastIndex);
+        list_removeItemIndexed(stack, stackLastIndex);
+        list_addItem(dirsToDelete, poppedDir); // move from stack to dirsToDelete list
+
+        const DIR *dir = opendir(poppedDir);
+        if (dir == NULL) continue;
+
+        while ((entry = readdir(dir))) {
+            sprintf(pathBuffer, "%s/%s", poppedDir, entry->d_name);
+            if (entry->d_type == DT_REG) { // file
+                remove(pathBuffer); // delete files as we find them
+            } else if (entry->d_type == DT_DIR) { // dir
+                char *pathCopy = alloc(strlen(pathBuffer) + 1);
+                strcpy(pathCopy, pathBuffer);
+                list_addItem(stack, pathCopy); // add to stack to be processed on next loop
             }
         }
+        closedir(dir);
     }
+    // Reverse loop on dirsToDelete ensures that rmdir calls are always done on empty dirs
+    for (int i = (int) list_getSize(dirsToDelete) - 1; i >= 0; i--) {
+        const char *dirToDelete = list_getItem(dirsToDelete, i);
+        INFO("dirToDelete %p %s", dirToDelete, dirToDelete);
+        if (dirToDelete == NULL) continue;
+        if ((rmdir(dirToDelete) != 0)) {
+            int err = errno;
+            throw(STORAGE_ERROR_GENERIC_FAILURE, "rmdir() returned %i: %s", err, strerror(err));
+        }
+        INFO("Deleted %s", dirToDelete);
+        if (dirToDelete != dirPath) { // all but root were allocated, so they need to be freed
+            free(dirToDelete);
+        }
+    }
+    list_destroy(stack);
+    list_destroy(dirsToDelete);
+    return STORAGE_ERROR_NONE;
 }
 
 /*============================= Public API ==================================*/
@@ -324,26 +345,23 @@ public StorageError externalStorage_createDir(const char *dirPath) {
     return STORAGE_ERROR_NONE;
 }
 
-private StorageError externalStorage_readDirPrivate(const char *dirPath,
-                                                    char **dirEntries,
-                                                    size_t *entryCount,
-                                                    bool prefix) {
+public StorageError externalStorage_readDir(const char *dirPath, char **dirEntries, size_t *entryCount) {
+    requireParamNotNull(dirPath, "dirPath");
+    requireParamNotNull(entryCount, "entryCount");
+
     bool fillEntries = true;
     if (dirEntries == NULL) { // user only wants count and not to fill array
         fillEntries = false;
     }
 
     char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
-    if (prefix) {
-        getPrefixedPath(pathBuffer, dirPath);
-    } else {
-        sprintf(pathBuffer, "%s", dirPath);
-    }
+    getPrefixedPath(pathBuffer, dirPath);
+
     DIR *dir = opendir(pathBuffer);
     if (dir == NULL) {
         int err = errno;
-        *entryCount = 0;
         if (err == ENOENT) {
+            *entryCount = 0;
             throw(STORAGE_ERROR_NOT_FOUND, "dir not found: %s", dirPath);
         } else {
             throw(STORAGE_ERROR_GENERIC_FAILURE, "opendir() returned %i: %s", err, strerror(err));
@@ -361,13 +379,6 @@ private StorageError externalStorage_readDirPrivate(const char *dirPath,
     *entryCount = entries;
 
     return STORAGE_ERROR_NONE;
-}
-
-public StorageError externalStorage_readDir(const char *dirPath, char **dirEntries, size_t *entryCount) {
-    requireParamNotNull(dirPath, "dirPath");
-    requireParamNotNull(entryCount, "entryCount");
-
-    return externalStorage_readDirPrivate(dirPath, dirEntries, entryCount, /*prefix=*/true);
 }
 
 public StorageError externalStorage_moveDir(const char *dirPath, const char *newDirPath) {
@@ -392,18 +403,12 @@ public StorageError externalStorage_deleteDir(const char *dirPath) {
     requireParamNotNull(dirPath, "dirPath");
     char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
     getPrefixedPath(pathBuffer, dirPath);
-    DIR *dir = opendir(pathBuffer);
-    if (dir == NULL) {
-        int err = errno;
-        if (err == ENOENT) {
-            throw(STORAGE_ERROR_NOT_FOUND, "dir not found: %s", dirPath);
-        } else {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "opendir() returned %i: %s", err, strerror(err));
-        }
+    bool dirExists;
+    externalStorage_queryDirExists(dirPath, &dirExists);
+    if (!dirExists) {
+        throw(STORAGE_ERROR_NOT_FOUND, "dir not found: %s", dirPath);
     }
-    externalStorage_deleteDirContents(pathBuffer, dir);
-    rmdir(pathBuffer);
-    closedir(dir);
+    throwIfError(externalStorage_deleteDirAndContents(pathBuffer), "could not delete dir and/or contents");
     return STORAGE_ERROR_NONE;
 }
 
@@ -437,9 +442,9 @@ public StorageError externalStorage_createFile(const char *filePath) {
     char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
     getPrefixedPath(pathBuffer, filePath);
     bool fileExists;
-    externalStorage_queryFileExists(filePath, &fileExists);
+    externalStorage_queryFileExists(pathBuffer, &fileExists);
     if (!fileExists) {
-        FILE *file = fopen(filePath, "w");
+        FILE *file = fopen(pathBuffer, "w");
         if (file != NULL) {
             fclose(file);
         }
