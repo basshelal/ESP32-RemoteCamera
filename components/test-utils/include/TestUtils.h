@@ -58,6 +58,8 @@ afterEach##__FILENAME__(); \
 #define testCase(name) TEST_CASE(name, "")
 #define xtestCase(name) XTEST_CASE(name, "")
 
+#define run(name) testCase("run: "name)
+
 #define ignoreTest() TEST_IGNORE()
 
 #endif //ESP32_REMOTECAMERA_TEST_TESTUTILS_H

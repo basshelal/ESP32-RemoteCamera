@@ -69,7 +69,7 @@ extern StorageError externalStorage_readFile(const FILE *file,
                                              const uint bufferLength,
                                              uint *bytesRead);
 
-extern StorageError externalStorage_writeFile(const char *filePath,
+extern StorageError externalStorage_writeFile(const FILE *file,
                                               size_t startPosition,
                                               const void *buffer,
                                               const uint bufferLength,

@@ -157,13 +157,11 @@ private StorageError externalStorage_deleteDirAndContents(const char *dirPath) {
     // Reverse loop on dirsToDelete ensures that rmdir calls are always done on empty dirs
     for (int i = (int) list_getSize(dirsToDelete) - 1; i >= 0; i--) {
         const char *dirToDelete = list_getItem(dirsToDelete, i);
-        INFO("dirToDelete %p %s", dirToDelete, dirToDelete);
         if (dirToDelete == NULL) continue;
         if ((rmdir(dirToDelete) != 0)) {
             int err = errno;
             throw(STORAGE_ERROR_GENERIC_FAILURE, "rmdir() returned %i: %s", err, strerror(err));
         }
-        INFO("Deleted %s", dirToDelete);
         if (dirToDelete != dirPath) { // all but root were allocated, so they need to be freed
             free(dirToDelete);
         }
@@ -313,6 +311,7 @@ public StorageError externalStorage_queryDirExists(const char *dirPath, bool *di
     return STORAGE_ERROR_NONE;
 }
 
+// TODO: 11-Sep-2022 @basshelal: This will probably be deleted!
 public StorageError externalStorage_queryDirInfo(const char *dirPath, DirInfo *dirInfo) {
     requireParamNotNull(dirPath, "dirPath");
     requireParamNotNull(dirInfo, "dirInfo");
@@ -414,6 +413,9 @@ public StorageError externalStorage_deleteDir(const char *dirPath) {
 
 /*============================= Files =======================================*/
 
+// TODO: 11-Sep-2022 @basshelal: Most if not all of this can be shared with internal storage with minor changes
+//  so we should have a single implementation that both call to
+
 public StorageError externalStorage_queryFileExists(const char *filePath,
                                                     bool *fileExists) {
     requireParamNotNull(filePath, "dirPath");
@@ -434,7 +436,23 @@ public StorageError externalStorage_queryFileExists(const char *filePath,
 }
 
 public StorageError externalStorage_queryFileInfo(const char *filePath, FileInfo *fileInfo) {
-    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+    requireParamNotNull(filePath, "filePath");
+    requireParamNotNull(fileInfo, "fileInfo");
+    char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(pathBuffer, filePath);
+
+    struct stat statResult;
+    if ((stat(pathBuffer, &statResult)) != 0) {
+        int err = errno;
+        if (errno == ENOENT) {
+            throw(STORAGE_ERROR_NOT_FOUND, "file not found: %s", filePath);
+        } else {
+            throw(STORAGE_ERROR_GENERIC_FAILURE, "stat() returned %i: %s", err, strerror(err));
+        }
+    }
+    fileInfo->sizeBytes = (uint32_t) statResult.st_size;
+
+    return STORAGE_ERROR_NONE;
 }
 
 public StorageError externalStorage_createFile(const char *filePath) {
@@ -455,11 +473,44 @@ public StorageError externalStorage_createFile(const char *filePath) {
 public StorageError externalStorage_openFile(const char *filePath,
                                              FILE **fileIn,
                                              const FileMode fileMode) {
-    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+    requireParamNotNull(filePath, "filePath");
+    requireParamNotNull(fileIn, "fileIn");
+
+    bool fileExists;
+    const StorageError storageError = externalStorage_queryFileExists(filePath, &fileExists);
+    if (storageError != STORAGE_ERROR_NONE) {
+        throw(storageError, "could not check if file exists before opening: %s", filePath);
+    }
+    if (!fileExists) {
+        throw(STORAGE_ERROR_NOT_FOUND, "file not found: %s", filePath);
+    }
+
+    char pathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(pathBuffer, filePath);
+
+    FILE *file = fopen(pathBuffer, fileModeToString(fileMode));
+    if (file == NULL) {
+        int err = errno;
+        if (err == ENOENT) {
+            throw(STORAGE_ERROR_NOT_FOUND, "file not found: %s", filePath);
+        } else {
+            throw(STORAGE_ERROR_GENERIC_FAILURE, "fopen() returned %i: %s", err, strerror(err));
+        }
+    } else {
+        *fileIn = file;
+    }
+
+    return STORAGE_ERROR_NONE;
 }
 
 public StorageError externalStorage_closeFile(const FILE *fileIn) {
-    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+    requireParamNotNull(fileIn, "fileIn");
+
+    if ((fclose(fileIn) != 0)) {
+        int err = errno;
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "fclose() returned %i: %s", err, strerror(err));
+    }
+    return STORAGE_ERROR_NONE;
 }
 
 public StorageError externalStorage_readFile(const FILE *file,
@@ -467,19 +518,63 @@ public StorageError externalStorage_readFile(const FILE *file,
                                              void *bufferIn,
                                              const uint bufferLength,
                                              uint *bytesRead) {
-    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+    requireParamNotNull(file, "file");
+    requireParamNotNull(bufferIn, "bufferIn");
+    requireParamNotNull(bytesRead, "bytesRead");
+
+    int err;
+    if ((err = fsetpos(file, (fpos_t *) &startPosition))) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "fsetpos() returned error %i: %s", err, strerror(err));
+    }
+    *bytesRead = fread(bufferIn, sizeof(char), bufferLength, file);
+    if ((err = ferror(file))) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "fread() returned error %i: %s", err, strerror(err));
+    }
+
+    return STORAGE_ERROR_NONE;
 }
 
-public StorageError externalStorage_writeFile(const char *filePath,
+public StorageError externalStorage_writeFile(const FILE *file,
                                               size_t startPosition,
                                               const void *buffer,
                                               const uint bufferLength,
                                               uint *bytesWritten) {
-    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+    requireParamNotNull(file, "file");
+    requireParamNotNull(buffer, "buffer");
+    requireParamNotNull(bytesWritten, "bytesWritten");
+
+    int err;
+    if ((err = fsetpos(file, (fpos_t *) &startPosition))) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "fsetpos() returned error %i: %s", err, strerror(err));
+    }
+    *bytesWritten = fwrite(buffer, sizeof(char), bufferLength, file);
+    if ((err = ferror(file))) {
+        throw(STORAGE_ERROR_GENERIC_FAILURE, "fwrite() returned error %i: %s", err, strerror(err));
+    }
+
+    return STORAGE_ERROR_NONE;
 }
 
 public StorageError externalStorage_moveFile(const char *filePath, const char *newFilePath) {
-    throw(STORAGE_ERROR_GENERIC_FAILURE, "Not Implemented!");
+    requireParamNotNull(filePath, "filePath");
+    requireParamNotNull(newFilePath, "newFilePath");
+
+    char oldPathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(oldPathBuffer, filePath);
+
+    char newPathBuffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
+    getPrefixedPath(newPathBuffer, newFilePath);
+
+    if ((rename(oldPathBuffer, newPathBuffer) != 0)) {
+        int err = errno;
+        if (err == ENOENT) {
+            throw(STORAGE_ERROR_NOT_FOUND, "file(s) not found: %s -> %s", filePath, newFilePath);
+        } else {
+            throw(STORAGE_ERROR_GENERIC_FAILURE, "rename() returned %i: %s", err, strerror(err));
+        }
+    }
+
+    return STORAGE_ERROR_NONE;
 }
 
 public StorageError externalStorage_deleteFile(const char *filePath) {

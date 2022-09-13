@@ -5,17 +5,17 @@
 
 typedef struct StorageInfo {
     char *mountPoint;
-    uint64_t totalBytes;
-    uint64_t usedBytes;
-    uint64_t freeBytes;
+    uint32_t totalBytes;
+    uint32_t usedBytes;
+    uint32_t freeBytes;
 } StorageInfo;
 
 typedef struct FileInfo {
-    uint64_t sizeBytes;
+    uint32_t sizeBytes;
 } FileInfo;
 
 typedef struct DirInfo {
-    uint64_t sizeBytes;
+    uint32_t sizeBytes;
 } DirInfo;
 
 #endif //ESP32_REMOTECAMERA_INFO_H

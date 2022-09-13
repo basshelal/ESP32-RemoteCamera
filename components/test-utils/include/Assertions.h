@@ -14,6 +14,9 @@
 #define assertEqualInt(expected, actual) \
 do{TEST_ASSERT_EQUAL_INT(expected, actual);}while(0)
 
+#define assertEqualChar(expected, actual) \
+do{TEST_ASSERT_EQUAL_INT8(expected, actual);}while(0)
+
 #define assertNotEqualInt(expected, actual) \
 do{TEST_ASSERT_NOT_EQUAL(expected, actual);}while(0)
 
@@ -24,8 +27,14 @@ do{TEST_ASSERT_NOT_EQUAL(expected, actual);}while(0)
 #define assertEqualUInt64(expected, actual) \
 do{TEST_ASSERT_EQUAL_UINT64(expected, actual);}while(0)
 
+#define assertNotEqualUInt64(expected, actual) \
+do{TEST_ASSERT_NOT_EQUAL(expected, actual);}while(0)
+
 #define assertEqualUInt(expected, actual) \
 do{TEST_ASSERT_EQUAL_UINT(expected, actual);}while(0)
+
+#define assertNotEqualUInt(expected, actual) \
+do{TEST_ASSERT_NOT_EQUAL(expected, actual);}while(0)
 
 #define assertGreaterThanInt(threshold, actual, message, ...) \
 do{UNITY_TEST_ASSERT_GREATER_THAN_INT(threshold, actual, __LINE__, MESSAGE(message, ##__VA_ARGS__));}while(0)
