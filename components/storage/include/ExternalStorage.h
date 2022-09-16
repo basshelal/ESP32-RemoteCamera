@@ -1,11 +1,11 @@
 #ifndef ESP32_REMOTECAMERA_EXTERNALSTORAGE_H
 #define ESP32_REMOTECAMERA_EXTERNALSTORAGE_H
 
+#include "StorageError.h"
+#include "StorageInfo.h"
+#include "FileMode.h"
 #include "Constants.h"
 #include "Utils.h"
-#include "StorageError.h"
-#include "FileMode.h"
-#include "Info.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <ff.h>
@@ -57,23 +57,15 @@ extern StorageError externalStorage_queryFileInfo(const char *filePath, FileInfo
 
 extern StorageError externalStorage_createFile(const char *filePath);
 
-extern StorageError externalStorage_openFile(const char *filePath,
-                                             FILE **fileIn,
-                                             const FileMode fileMode);
+extern StorageError externalStorage_openFile(const char *filePath, FILE **fileIn, const FileMode fileMode);
 
 extern StorageError externalStorage_closeFile(const FILE *fileIn);
 
-extern StorageError externalStorage_readFile(const FILE *file,
-                                             size_t startPosition,
-                                             void *bufferIn,
-                                             const uint bufferLength,
-                                             uint *bytesRead);
+extern StorageError externalStorage_readFile(const FILE *file, const size_t startPosition,
+                                             void *bufferIn, const uint bufferLength, uint *bytesRead);
 
-extern StorageError externalStorage_writeFile(const FILE *file,
-                                              size_t startPosition,
-                                              const void *buffer,
-                                              const uint bufferLength,
-                                              uint *bytesWritten);
+extern StorageError externalStorage_writeFile(const FILE *file, const size_t startPosition,
+                                              const void *buffer, const uint bufferLength, uint *bytesWritten);
 
 // Rename is a move operation like Unix
 extern StorageError externalStorage_moveFile(const char *filePath, const char *newFilePath);

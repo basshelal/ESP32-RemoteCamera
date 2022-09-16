@@ -7,8 +7,7 @@
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
-#include "StorageError.h"
-#include "InternalStorage.h"
+#include "Settings.h"
 
 // From secrets.h a git-ignored file
 #define WIFI_SSID SECRET_WIFI_SSID
@@ -128,21 +127,24 @@ private inline esp_err_t wifi_ipAddressUInt8ArrayToUInt32(uint32_t *uint32Result
 }
 
 private bool wifi_hasWifiCredentialsInStorage() {
-    return internalStorage_hasKey(INTERNAL_STORAGE_KEY_WIFI_SSID) &&
-           internalStorage_hasKey(INTERNAL_STORAGE_KEY_WIFI_PASSWORD) &&
-           internalStorage_hasKey(INTERNAL_STORAGE_KEY_WIFI_IP_ADDRESS);
+    bool hasWifiSSID, hasWifiPassword, hasWifiIPAddress;
+    settings_hasKey(SETTINGS_KEY_WIFI_SSID, &hasWifiSSID);
+    settings_hasKey(SETTINGS_KEY_WIFI_PASSWORD, &hasWifiPassword);
+    settings_hasKey(SETTINGS_KEY_WIFI_IP_ADDRESS, &hasWifiIPAddress);
+
+    return hasWifiSSID && hasWifiPassword && hasWifiIPAddress;
 }
 
-private StorageError wifi_retrieveWifiCredentialsFromStorage(
+private SettingsError wifi_retrieveWifiCredentialsFromSettings(
         char *wifiSSID, char *wifiPassword, uint32_t *ipAddress) {
-    requireNotNull(wifiSSID, STORAGE_ERROR_INVALID_PARAMETER, "wifiSSID cannot be NULL");
-    requireNotNull(wifiPassword, STORAGE_ERROR_INVALID_PARAMETER, "wifiPassword cannot be NULL");
-    requireNotNull(ipAddress, STORAGE_ERROR_INVALID_PARAMETER, "ipAddress cannot be NULL");
+    requireNotNull(wifiSSID, SETTINGS_ERROR_INVALID_PARAMETER, "wifiSSID cannot be NULL");
+    requireNotNull(wifiPassword, SETTINGS_ERROR_INVALID_PARAMETER, "wifiPassword cannot be NULL");
+    requireNotNull(ipAddress, SETTINGS_ERROR_INVALID_PARAMETER, "ipAddress cannot be NULL");
 
-    StorageError err;
-    err = internalStorage_getString(INTERNAL_STORAGE_KEY_WIFI_SSID, wifiSSID);
-    err = internalStorage_getString(INTERNAL_STORAGE_KEY_WIFI_PASSWORD, wifiPassword);
-    err = internalStorage_getUInt32(INTERNAL_STORAGE_KEY_WIFI_IP_ADDRESS, ipAddress);
+    SettingsError err;
+    err = settings_getString(SETTINGS_KEY_WIFI_SSID, wifiSSID);
+    err = settings_getString(SETTINGS_KEY_WIFI_PASSWORD, wifiPassword);
+    err = settings_getUInt32(SETTINGS_KEY_WIFI_IP_ADDRESS, ipAddress);
     // TODO: 01-Aug-2022 @basshelal: Error checks!
 
     // TODO: 01-Aug-2022 @basshelal: Hardcoded values until we implement proper setting of these values
@@ -151,7 +153,7 @@ private StorageError wifi_retrieveWifiCredentialsFromStorage(
     uint8_t ipArray[4] = {192, 168, 0, 123};
     wifi_ipAddressUInt8ArrayToUInt32(ipAddress, ipArray, sizeof(ipArray));
 
-    return STORAGE_ERROR_NONE;
+    return SETTINGS_ERROR_NONE;
 }
 
 private WifiError wifi_connectSTA() {
@@ -161,7 +163,7 @@ private WifiError wifi_connectSTA() {
     char wifiSSID[WIFI_SSID_MAX_LENGTH];
     char wifiPassword[WIFI_PASSWORD_MAX_LENGTH];
     uint32_t ipAddress;
-    StorageError storageError = wifi_retrieveWifiCredentialsFromStorage(wifiSSID, wifiPassword, &ipAddress);
+    SettingsError settingsError = wifi_retrieveWifiCredentialsFromSettings(wifiSSID, wifiPassword, &ipAddress);
 
     this.eventGroupSTA = xEventGroupCreate();
     if (this.eventGroupSTA == NULL) {
@@ -277,9 +279,9 @@ public WifiError wifi_init() {
     if (!this.initialized) {
         VERBOSE("Initializing Wifi");
         esp_err_t err;
-        // Initialize internal storage for PHY calibration stored in NVS and for later fetching of Wifi details
-        StorageError storageError = internalStorage_init();
-        if (storageError != STORAGE_ERROR_NONE) {
+        // Initialize settings for PHY calibration stored in NVS and for later fetching of Wifi details
+        SettingsError settingsError = settings_init();
+        if (settingsError != SETTINGS_ERROR_NONE) {
             throw(WIFI_ERROR_GENERIC_FAILURE, "Could not initialize Wifi, internal storage initialization failed");
         }
 

@@ -1,7 +1,7 @@
 #ifndef ESP32_REMOTECAMERA_INFO_H
 #define ESP32_REMOTECAMERA_INFO_H
 
-#include <stddef.h>
+#include <stdint.h>
 
 typedef struct StorageInfo {
     char *mountPoint;

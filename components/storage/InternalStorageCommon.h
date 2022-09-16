@@ -1,9 +1,0 @@
-#ifndef ESP32_REMOTECAMERA_INTERNALSTORAGECOMMON_H
-#define ESP32_REMOTECAMERA_INTERNALSTORAGECOMMON_H
-
-#include "Utils.h"
-
-//#define LOG_TAG "InternalStorage:"__FILENAME__
-#define undeclared static
-
-#endif //ESP32_REMOTECAMERA_INTERNALSTORAGECOMMON_H

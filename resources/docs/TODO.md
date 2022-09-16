@@ -1,15 +1,7 @@
 # TODO
 
-## External Storage
-* Check for existing and valid external storage
-* External storage stats, remaining/used space, file count, dir count etc
-* Read dirs and files (using POSIX APIs)
-* Create dirs and files (using POSIX APIs)
-* Write (update and delete) dirs and files (using POSIX APIs)
-
 ## Internal Storage
-* Split NVS from SPIFFS, NVS is too dissimilar to SPIFFS and External Storage
-  so it should be its own "Settings" component
+* Tests
 
 ## Generic
 * Modify all functions to follow improved coding style, all functions return either an ErrorType

@@ -46,28 +46,29 @@ requestHandler("/pages", pages) {
     allowCORS(request);
     INFO("URI: %s", request->uri);
     httpd_resp_set_status(request, HTTPD_200);
-    const bool exists = internalStorage_queryFileExists("index.html");
+    bool exists;
+    internalStorage_queryFileExists("index.html", &exists);
 
     esp_err_t espErr;
     if (exists) {
-        uint sizeBytes;
-        internalStorage_queryFileSize("index.html", &sizeBytes);
+        FileInfo fileInfo;
+        internalStorage_queryFileInfo("index.html", &fileInfo);
 
         FILE *file;
         internalStorage_openFile("index.html", &file, FILE_MODE_READ);
-        uint bytesRemaining = sizeBytes;
-        uint position = 0;
+        uint32_t bytesRemaining = fileInfo.sizeBytes;
+        uint32_t readPosition = 0;
         while (bytesRemaining > 0) {
             uint bytesRead;
             const uint bytesToRead = (bytesRemaining < FILE_BUFFER_SIZE) ? bytesRemaining : FILE_BUFFER_SIZE;
-            internalStorage_readFileChunks(file, INTERNAL_STORAGE_POSITION_CONTINUE,
-                                           fileBuffer, bytesToRead, &bytesRead);
+            internalStorage_readFile(file, readPosition,
+                                     fileBuffer, bytesToRead, &bytesRead);
             espErr = httpd_resp_send_chunk(request, fileBuffer, (ssize_t) bytesRead);
             if (espErr != ESP_OK) {
                 ERROR("httpd_resp_send_chunk() returned %i : %s", espErr, esp_err_to_name(espErr));
             }
             bytesRemaining -= bytesRead;
-            position += bytesRead;
+            readPosition += bytesRead;
         }
         espErr = httpd_resp_send_chunk(request, NULL, 0);
         if (espErr != ESP_OK) {
@@ -84,25 +85,29 @@ requestHandler("/pages/favicon", favIcon) {
     allowCORS(request);
     INFO("URI: %s", request->uri);
     httpd_resp_set_status(request, HTTPD_200);
-    const bool exists = internalStorage_queryFileExists("favicon.ico");
+    bool exists;
+    internalStorage_queryFileExists("favicon.ico", &exists);
+
     esp_err_t espErr;
     if (exists) {
-        uint sizeBytes;
-        internalStorage_queryFileSize("favicon.ico", &sizeBytes);
+        FileInfo fileInfo;
+        internalStorage_queryFileInfo("favicon.ico", &fileInfo);
 
         FILE *file;
         internalStorage_openFile("favicon.ico", &file, FILE_MODE_READ);
-        uint bytesRemaining = sizeBytes;
+        uint32_t bytesRemaining = fileInfo.sizeBytes;
+        uint32_t readPosition = 0;
         while (bytesRemaining > 0) {
             uint bytesRead;
             const uint bytesToRead = (bytesRemaining < FILE_BUFFER_SIZE) ? bytesRemaining : FILE_BUFFER_SIZE;
-            internalStorage_readFileChunks(file, INTERNAL_STORAGE_POSITION_CONTINUE,
-                                           favIconFileBuffer, bytesToRead, &bytesRead);
+            internalStorage_readFile(file, readPosition, favIconFileBuffer,
+                                     bytesToRead, &bytesRead);
             espErr = httpd_resp_send_chunk(request, favIconFileBuffer, (ssize_t) bytesRead);
             if (espErr != ESP_OK) {
                 ERROR("httpd_resp_send_chunk() returned %i : %s", espErr, esp_err_to_name(espErr));
             }
             bytesRemaining -= bytesRead;
+            readPosition += bytesRead;
         }
         espErr = httpd_resp_send_chunk(request, NULL, 0);
         if (espErr != ESP_OK) {
