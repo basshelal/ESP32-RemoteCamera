@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 
 #define SPIFFS_PATH "/spiffs"
+#define SPIFFS_PARTITION "storage"
 #define SPIFFS_MAX_PATH_LENGTH CONFIG_SPIFFS_OBJ_NAME_LEN
 
 #define getPath(name, path) \
@@ -24,11 +25,10 @@ public StorageError internalStorage_init() {
         return STORAGE_ERROR_NONE;
     }
     VERBOSE("Initializing internal storage");
-    VERBOSE("Initializing SPIFFS");
     const esp_vfs_spiffs_conf_t conf = {
             .base_path = SPIFFS_PATH,
-            .partition_label = NULL,
-            .max_files = 5,
+            .partition_label = SPIFFS_PARTITION,
+            .max_files = 8,
             .format_if_mount_failed = false
     };
     esp_err_t err = esp_vfs_spiffs_register(&conf);
@@ -39,9 +39,8 @@ public StorageError internalStorage_init() {
     } else if (err != ESP_OK) {
         throw(STORAGE_ERROR_GENERIC_FAILURE, "esp_vfs_spiffs_register() returned error: %s", esp_err_to_name(err));
     }
-    VERBOSE("Successfully initialized SPIFFS");
-    this.isInitialized = true;
     VERBOSE("Successfully initialized internal storage");
+    this.isInitialized = true;
     return STORAGE_ERROR_NONE;
 }
 
@@ -51,13 +50,12 @@ public StorageError internalStorage_destroy() {
               "could not destroy internal storage, internal storage was not initialized");
     }
     VERBOSE("Destroying internal storage");
-    VERBOSE("Destroying SPIFFS");
-    esp_err_t err = esp_vfs_spiffs_unregister(NULL);
+    esp_err_t err = esp_vfs_spiffs_unregister(SPIFFS_PARTITION);
     if (err == ESP_ERR_INVALID_STATE) {
         WARN("SPIFFS already unregistered");
     }
-    VERBOSE("Successfully destroyed SPIFFS");
     VERBOSE("Successfully destroyed internal storage");
+    this.isInitialized = false;
     return STORAGE_ERROR_NONE;
 }
 
@@ -120,11 +118,10 @@ public StorageError internalStorage_moveFile(const char *filePath, const char *n
     requireParamNotNull(newFilePath);
 
     getPath(oldPath, filePath);
-    getPath(newPath, filePath);
+    getPath(newPath, newFilePath);
 
     return storage_moveFile(oldPath, newPath);
 }
-
 
 public StorageError internalStorage_deleteFile(const char *filePath) {
     requireParamNotNull(filePath);

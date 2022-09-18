@@ -160,8 +160,11 @@ public StorageError storage_deleteDir(const char *dirPath) {
 
 /*============================= Files =======================================*/
 
-public StorageError storage_queryFileExists(const char *filePath,
-                                            bool *fileExists) {
+public StorageError storage_queryFileExists(const char *filePath, bool *fileExists){
+    return storage_queryFileExistsStat(filePath, fileExists);
+}
+
+public StorageError storage_queryFileExistsAccess(const char *filePath,bool *fileExists) {
     if (access(filePath, F_OK) == 0) {
         *fileExists = true;
     } else {
@@ -170,6 +173,21 @@ public StorageError storage_queryFileExists(const char *filePath,
             *fileExists = false;
         } else {
             throw(STORAGE_ERROR_GENERIC_FAILURE, "access() returned %i: %s", err, strerror(err));
+        }
+    }
+    return STORAGE_ERROR_NONE;
+}
+
+public StorageError storage_queryFileExistsStat(const char *filePath,bool *fileExists) {
+    struct stat statResult;
+    if (stat(filePath, &statResult) == 0) {
+        *fileExists = true;
+    } else {
+        int err = errno;
+        if (errno == ENOENT) {
+            *fileExists = false;
+        } else {
+            throw(STORAGE_ERROR_GENERIC_FAILURE, "stat() returned %i: %s", err, strerror(err));
         }
     }
     return STORAGE_ERROR_NONE;

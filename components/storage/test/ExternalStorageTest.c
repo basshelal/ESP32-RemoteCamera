@@ -271,7 +271,7 @@ testCase("non existent file write") {
 
 testCase("non existent file move") {
     assertEqualInt(STORAGE_ERROR_NOT_FOUND,
-                   externalStorage_moveFile(testFileName, newTestDirName));
+                   externalStorage_moveFile(testFileName, newTestFileName));
 }
 
 testCase("non existent file delete") {
@@ -312,8 +312,8 @@ testCase("file close") {
     assertOK(externalStorage_closeFile(file));
 }
 
-const uint bufferLength = 256;
-char *writeBuffer = NULL;
+private const uint bufferLength = 256;
+private char *writeBuffer = NULL;
 
 testCase("file write") {
     writeBuffer = calloc(bufferLength, sizeof(char));
@@ -347,6 +347,7 @@ testCase("file read") {
     }
     free(readBuffer);
     free(writeBuffer);
+    assertOK(externalStorage_closeFile(file));
 }
 
 testCase("file move") {
