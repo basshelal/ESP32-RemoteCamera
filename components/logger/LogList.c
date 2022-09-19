@@ -65,10 +65,10 @@ public void logList_append(LogList *logList, const char *string) {
     }
 }
 
-public ListError logList_getList(LogList *logList, List *listIn) {
-    if (!logList || !listIn) return LIST_ERROR_NULL_LIST;
+public Error logList_getList(LogList *logList, List *listIn) {
+    if (!logList || !listIn) return ERROR_NULL_ARGUMENT;
     LogListData *this = (LogListData *) logList;
-    ListError err;
+    Error err;
     err = list_clear(listIn);
     if (err) return err;
     const capacity_t size = logList_getSize(this);
@@ -88,7 +88,7 @@ public ListError logList_getList(LogList *logList, List *listIn) {
             if (err) return err;
         }
     }
-    return LIST_ERROR_NONE;
+    return ERROR_NONE;
 }
 
 public unsigned int logList_getCapacity(LogList *logList) {

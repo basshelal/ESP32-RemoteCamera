@@ -57,7 +57,7 @@ TEST("List create with options growthFactor") {
 
 int callbackCalled = 0;
 
-void error_callback(const ListError listError) {
+void error_callback(const Error listError) {
     callbackCalled++;
 }
 
@@ -251,7 +251,7 @@ TEST("List modify items") {
 TEST("List setItem") {
     List *list = list_create();
 
-    ListError err = list_setItem(list, 0, &myTestItems[0]);
+    Error err = list_setItem(list, 0, &myTestItems[0]);
     ASSERT(err == 0, "Expected no errors but actually was: %i", err);
     int *result = list_getItem(list, 0);
     ASSERT_NOT_NULL(result, "result should not be null");

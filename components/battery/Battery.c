@@ -160,7 +160,7 @@ private void battery_taskFunction(void *arg) {
     vTaskDelete(thisPtr->task.handle);
 }
 
-public BatteryError battery_init() {
+public Error battery_init() {
     this.characteristics = new(esp_adc_cal_characteristics_t);
     this.batteryChannel = ADC1_CHANNEL_7;
     this.usbChannel = ADC1_CHANNEL_4;
@@ -216,7 +216,7 @@ public BatteryError battery_init() {
     }
     INFO("ADC Calibration used is: %s ", calibrationToString);
 
-    return BATTERY_ERROR_NONE;
+    return ERROR_NONE;
 }
 
 public void battery_setSampleCount(const uint samplesCount) { this.batterySamplesCount = samplesCount; }
@@ -238,8 +238,8 @@ public bool battery_isCharging() {
     return usbVoltage > 1000.0F;
 }
 
-public BatteryError battery_getInfo(BatteryInfo *batteryInfo) {
-    requireNotNull(batteryInfo, BATTERY_ERROR_INVALID_PARAMETER, "batterInfo cannot be null");
+public Error battery_getInfo(BatteryInfo *batteryInfo) {
+    requireArgNotNull(batteryInfo);
     const uint reading = battery_getVoltageRawReading(this.batterySamplesCount);
     const bool isCharging = battery_isCharging();
     const float voltage = battery_getVoltageFromReading(reading, isCharging);
@@ -247,7 +247,7 @@ public BatteryError battery_getInfo(BatteryInfo *batteryInfo) {
     batteryInfo->isCharging = isCharging;
     batteryInfo->voltage = voltage;
     batteryInfo->percentage = percentage;
-    return BATTERY_ERROR_NONE;
+    return ERROR_NONE;
 }
 
 public void battery_addOnPercentageChangedCallback(PercentageChangedCallback percentageChangedCallback) {

@@ -41,20 +41,20 @@ testCase("non existent file query exists") {
 testCase("non existent file query info") {
     FileInfo fileInfo;
     fileInfo.sizeBytes = UINT_MAX;
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    internalStorage_queryFileInfo(testFileName, &fileInfo));
     assertEqualUInt(UINT_MAX, fileInfo.sizeBytes); // no change if failed
 }
 
 testCase("non existent file open") {
     FILE *file;
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    internalStorage_openFile(testFileName, &file, FILE_MODE_WRITE));
 }
 
 testCase("non existent file close") {
     FILE *file = NULL;
-    assertEqualInt(STORAGE_ERROR_INVALID_PARAMETER,
+    assertEqualInt(ERROR_NULL_ARGUMENT,
                    internalStorage_closeFile(file));
 }
 
@@ -66,7 +66,7 @@ testCase("non existent file read") {
         assertEqualChar(0, buffer[i]);
     }
     uint bytesRead = UINT_MAX;
-    assertEqualInt(STORAGE_ERROR_INVALID_PARAMETER,
+    assertEqualInt(ERROR_NULL_ARGUMENT,
                    internalStorage_readFile(file, /*startPosition=*/0, buffer, bufferSize, &bytesRead));
     for (int i = 0; i < bufferSize; i++) {
         assertEqualChar(0, buffer[i]); // no change if failed
@@ -80,19 +80,19 @@ testCase("non existent file write") {
     const uint bufferSize = 512;
     char *buffer = calloc(bufferSize, sizeof(char));
     uint bytesWritten = UINT_MAX;
-    assertEqualInt(STORAGE_ERROR_INVALID_PARAMETER,
+    assertEqualInt(ERROR_NULL_ARGUMENT,
                    internalStorage_writeFile(file, /*startPosition=*/0, buffer, bufferSize, &bytesWritten));
     assertEqualUInt(UINT_MAX, bytesWritten); // no change if failed
     free(buffer);
 }
 
 testCase("non existent file move") {
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    internalStorage_moveFile(testFileName, newTestFileName));
 }
 
 testCase("non existent file delete") {
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    internalStorage_deleteFile(testFileName));
 }
 

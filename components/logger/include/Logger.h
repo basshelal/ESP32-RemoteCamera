@@ -73,6 +73,12 @@ if (error != 0) {                                     \
 throw(error, message, ##__VA_ARGS__);                \
 }}while(0)
 
+#define throwESPError(functionName, errno) \
+throw(ERROR_LIBRARY_FAILURE, #functionName" returned: %i: %s", err, esp_err_to_name(err))
+
+#define throwLibCError(functionName, errno) \
+throw(ERROR_LIBRARY_FAILURE, #functionName" returned: %i: %s", err, strerror(err))
+
 #define require(condition, error, message, ...) \
 do{                                                  \
 if (!(condition)) {                                  \
@@ -80,5 +86,29 @@ throw(error, message, ##__VA_ARGS__);                \
 }}while(0)
 
 #define requireNotNull(pointer, error, message, ...) require(pointer != NULL, error, message, ##__VA_ARGS__)
+
+#define requireArgNotNull(element) \
+requireNotNull(element, ERROR_NULL_ARGUMENT, #element" cannot be NULL")
+
+#define try(errorable) \
+if((error = (errorable)))
+
+#define catch(errorValue) \
+if(error == (errorValue))
+
+inline void ass() {
+
+    Error error;
+    try(logList_getList(NULL, NULL)) {
+        catch(ERROR_NOT_FOUND) {
+
+        }
+        catch(ERROR_OUT_OF_BOUNDS) {
+
+        }
+    }
+
+
+}
 
 #endif //ESP32_REMOTECAMERA_LOGGER_H

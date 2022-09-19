@@ -5,7 +5,6 @@
 #include <sys/stat.h>
 #include <sys/unistd.h>
 #include "StorageCommon.h"
-#include "StorageError.h"
 #include "StorageInfo.h"
 #include "ExternalStorage.h"
 #include "Logger.h"
@@ -13,7 +12,7 @@
 
 #define MAX_PATH_LENGTH EXTERNAL_STORAGE_MAX_PATH_LENGTH
 
-private StorageError storage_deleteDirAndContents(const char *dirPath) {
+private Error storage_deleteDirAndContents(const char *dirPath) {
     List *stack = list_create();
     List *dirsToDelete = list_create();
     char pathBuffer[MAX_PATH_LENGTH];
@@ -53,7 +52,7 @@ private StorageError storage_deleteDirAndContents(const char *dirPath) {
         if (dirToDelete == NULL) continue;
         if ((rmdir(dirToDelete) != 0)) {
             int err = errno;
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "rmdir() returned %i: %s", err, strerror(err));
+            throwLibCError(rmdir(), err);
         }
         if (dirToDelete != dirPath) { // all but root were allocated, so they need to be freed
             free(dirToDelete);
@@ -61,52 +60,52 @@ private StorageError storage_deleteDirAndContents(const char *dirPath) {
     }
     list_destroy(stack);
     list_destroy(dirsToDelete);
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
 /*============================= Directories =================================*/
 
-public StorageError storage_queryDirExists(const char *dirPath, bool *dirExists) {
+public Error storage_queryDirExists(const char *dirPath, bool *dirExists) {
     DIR *dir = opendir(dirPath);
     if (dir == NULL) {
         int err = errno;
         if (err == ENOENT) {
             *dirExists = false;
         } else {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "opendir() returned %i: %s", err, strerror(err));
+            throwLibCError(opendir(), err);
         }
     } else {
         *dirExists = true;
         closedir(dir);
     }
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_queryDirInfo(const char *dirPath, DirInfo *dirInfo) {
+public Error storage_queryDirInfo(const char *dirPath, DirInfo *dirInfo) {
     struct stat statResult;
     if (stat(dirPath, &statResult) != 0) {
         int err = errno;
         if (err == ENOENT || err == ENOTDIR) {
-            throw(STORAGE_ERROR_NOT_FOUND, "dir not found: %s", dirPath);
+            throw(ERROR_NOT_FOUND, "dir not found: %s", dirPath);
         } else if (err != 0) {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "stat returned %i: %s", err, strerror(err));
+            throwLibCError(stat(), err);
         } else {
             // TODO: 04-Sep-2022 @basshelal: Implement or reconsider API
         }
     }
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_createDir(const char *dirPath) {
+public Error storage_createDir(const char *dirPath) {
     if (mkdir(dirPath, ACCESSPERMS) != 0) {
         int err = errno;
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "mkdir returned %i: %s", err, strerror(err));
+        throwLibCError(mkdir(), err);
     }
 
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_readDir(const char *dirPath, char **dirEntries, size_t *entryCount) {
+public Error storage_readDir(const char *dirPath, char **dirEntries, size_t *entryCount) {
     bool fillEntries = true;
     if (dirEntries == NULL) { // user only wants count and not to fill array
         fillEntries = false;
@@ -117,9 +116,9 @@ public StorageError storage_readDir(const char *dirPath, char **dirEntries, size
         int err = errno;
         if (err == ENOENT) {
             *entryCount = 0;
-            throw(STORAGE_ERROR_NOT_FOUND, "dir not found: %s", dirPath);
+            throw(ERROR_NOT_FOUND, "dir not found: %s", dirPath);
         } else {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "opendir() returned %i: %s", err, strerror(err));
+            throwLibCError(opendir(), err);
         }
     }
     size_t entries = 0;
@@ -133,38 +132,38 @@ public StorageError storage_readDir(const char *dirPath, char **dirEntries, size
     }
     *entryCount = entries;
 
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_moveDir(const char *dirPath, const char *newDirPath) {
+public Error storage_moveDir(const char *dirPath, const char *newDirPath) {
     if (rename(dirPath, newDirPath) != 0) {
         int err = errno;
         if (err == ENOENT) {
-            throw(STORAGE_ERROR_NOT_FOUND, "dir(s) not found: %s -> %s", dirPath, newDirPath);
+            throw(ERROR_NOT_FOUND, "dir(s) not found: %s -> %s", dirPath, newDirPath);
         } else {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "rename() returned %i: %s", err, strerror(err));
+            throwLibCError(rename(), err);
         }
     }
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_deleteDir(const char *dirPath) {
+public Error storage_deleteDir(const char *dirPath) {
     bool dirExists;
     storage_queryDirExists(dirPath, &dirExists);
     if (!dirExists) {
-        throw(STORAGE_ERROR_NOT_FOUND, "dir not found: %s", dirPath);
+        throw(ERROR_NOT_FOUND, "dir not found: %s", dirPath);
     }
     throwIfError(storage_deleteDirAndContents(dirPath), "could not delete dir and/or contents");
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
 /*============================= Files =======================================*/
 
-public StorageError storage_queryFileExists(const char *filePath, bool *fileExists){
+public Error storage_queryFileExists(const char *filePath, bool *fileExists) {
     return storage_queryFileExistsStat(filePath, fileExists);
 }
 
-public StorageError storage_queryFileExistsAccess(const char *filePath,bool *fileExists) {
+public Error storage_queryFileExistsAccess(const char *filePath, bool *fileExists) {
     if (access(filePath, F_OK) == 0) {
         *fileExists = true;
     } else {
@@ -172,13 +171,13 @@ public StorageError storage_queryFileExistsAccess(const char *filePath,bool *fil
         if (errno == ENOENT) {
             *fileExists = false;
         } else {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "access() returned %i: %s", err, strerror(err));
+            throwLibCError(access(), err);
         }
     }
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_queryFileExistsStat(const char *filePath,bool *fileExists) {
+public Error storage_queryFileExistsStat(const char *filePath, bool *fileExists) {
     struct stat statResult;
     if (stat(filePath, &statResult) == 0) {
         *fileExists = true;
@@ -187,121 +186,122 @@ public StorageError storage_queryFileExistsStat(const char *filePath,bool *fileE
         if (errno == ENOENT) {
             *fileExists = false;
         } else {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "stat() returned %i: %s", err, strerror(err));
+            throwLibCError(stat(), err);
         }
     }
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_queryFileInfo(const char *filePath, FileInfo *fileInfo) {
+public Error storage_queryFileInfo(const char *filePath, FileInfo *fileInfo) {
     struct stat statResult;
     if ((stat(filePath, &statResult)) != 0) {
         int err = errno;
         if (errno == ENOENT) {
-            throw(STORAGE_ERROR_NOT_FOUND, "file not found: %s", filePath);
+            throw(ERROR_NOT_FOUND, "file not found: %s", filePath);
         } else {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "stat() returned %i: %s", err, strerror(err));
+            throwLibCError(stat(), err);
         }
     }
     fileInfo->sizeBytes = (uint32_t) statResult.st_size;
 
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_createFile(const char *filePath) {
+public Error storage_createFile(const char *filePath) {
     bool fileExists;
     storage_queryFileExists(filePath, &fileExists);
     if (!fileExists) {
         FILE *file = fopen(filePath, "w");
         if (file != NULL) {
             fclose(file);
+        } else {
+            int err = errno;
+            throwLibCError(fopen(), err);
         }
     }
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_openFile(const char *filePath, FILE **fileIn, const FileMode fileMode) {
+public Error storage_openFile(const char *filePath, FILE **fileIn, const FileMode fileMode) {
     bool fileExists;
-    const StorageError storageError = storage_queryFileExists(filePath, &fileExists);
-    if (storageError != STORAGE_ERROR_NONE) {
-        throw(storageError, "could not check if file exists before opening: %s", filePath);
-    }
+    throwIfError(storage_queryFileExists(filePath, &fileExists),
+                 "could not check if file exists before opening: %s", filePath);
     if (!fileExists) {
-        throw(STORAGE_ERROR_NOT_FOUND, "file not found: %s", filePath);
+        throw(ERROR_NOT_FOUND, "file not found: %s", filePath);
     }
 
     FILE *file = fopen(filePath, fileModeToString(fileMode));
     if (file == NULL) {
         int err = errno;
         if (err == ENOENT) {
-            throw(STORAGE_ERROR_NOT_FOUND, "file not found: %s", filePath);
+            throw(ERROR_NOT_FOUND, "file not found: %s", filePath);
         } else {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "fopen() returned %i: %s", err, strerror(err));
+            throwLibCError(fopen(), err);
         }
     } else {
         *fileIn = file;
     }
 
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_closeFile(const FILE *fileIn) {
+public Error storage_closeFile(const FILE *fileIn) {
     if ((fclose(fileIn) != 0)) {
         int err = errno;
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "fclose() returned %i: %s", err, strerror(err));
+        throwLibCError(fclose(), err);
     }
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_readFile(const FILE *file, size_t startPosition,
-                                     void *bufferIn, const uint bufferLength, uint *bytesRead) {
+public Error storage_readFile(const FILE *file, size_t startPosition,
+                              void *bufferIn, const uint bufferLength, uint *bytesRead) {
     int err;
     if ((err = fsetpos(file, (fpos_t *) &startPosition))) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "fsetpos() returned error %i: %s", err, strerror(err));
+        throwLibCError(fsetpos(), err);
     }
     *bytesRead = fread(bufferIn, sizeof(char), bufferLength, file);
     if ((err = ferror(file))) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "fread() returned error %i: %s", err, strerror(err));
+        throwLibCError(fread(), err);
     }
 
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_writeFile(const FILE *file, size_t startPosition,
-                                      const void *buffer, const uint bufferLength, uint *bytesWritten) {
+public Error storage_writeFile(const FILE *file, size_t startPosition,
+                               const void *buffer, const uint bufferLength, uint *bytesWritten) {
     int err;
     if ((err = fsetpos(file, (fpos_t *) &startPosition))) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "fsetpos() returned error %i: %s", err, strerror(err));
+        throwLibCError(fsetpos(), err);
     }
     *bytesWritten = fwrite(buffer, sizeof(char), bufferLength, file);
     if ((err = ferror(file))) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "fwrite() returned error %i: %s", err, strerror(err));
+        throwLibCError(fwrite(), err);
     }
 
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_moveFile(const char *filePath, const char *newFilePath) {
+public Error storage_moveFile(const char *filePath, const char *newFilePath) {
     if ((rename(filePath, newFilePath) != 0)) {
         int err = errno;
         if (err == ENOENT) {
-            throw(STORAGE_ERROR_NOT_FOUND, "file(s) not found: %s -> %s", filePath, newFilePath);
+            throw(ERROR_NOT_FOUND, "file(s) not found: %s -> %s", filePath, newFilePath);
         } else {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "rename() returned %i: %s", err, strerror(err));
+            throwLibCError(rename(), err);
         }
     }
 
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError storage_deleteFile(const char *filePath) {
+public Error storage_deleteFile(const char *filePath) {
     if (remove(filePath) != 0) {
         int err = errno;
         if (err == ENOENT) {
-            throw(STORAGE_ERROR_NOT_FOUND, "file not found: %s", filePath);
+            throw(ERROR_NOT_FOUND, "file not found: %s", filePath);
         } else {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "remove() returned %i: %s", err, strerror(err));
+            throwLibCError(remove(), err);
         }
     }
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }

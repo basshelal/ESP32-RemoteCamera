@@ -21,10 +21,6 @@ private struct {
     List *tasksList;
 } this;
 
-private void tasksListErrorCallback(const ListError error) {
-
-}
-
 private void findTaskInList(const char *taskName, int *index, Task **taskResult) {
     for (int i = 0; i < list_getSize(this.tasksList); i++) {
         Task *task = list_getItem(this.tasksList, i);
@@ -47,7 +43,7 @@ public void taskWatcher_init() {
         ListOptions listOptions = LIST_DEFAULT_OPTIONS;
         listOptions.capacity = 10;
         listOptions.isGrowable = true;
-        listOptions.errorCallback = tasksListErrorCallback;
+        listOptions.errorCallback = NULL;
         this.tasksList = list_createWithOptions(&listOptions);
 
         this.isInitialized = true;

@@ -2,7 +2,7 @@
 #define ESP32_REMOTECAMERA_BATTERY_H
 
 #include <stdbool.h>
-#include "BatteryError.h"
+#include "Error.h"
 #include "Utils.h"
 
 typedef struct BatteryInfo{
@@ -15,7 +15,7 @@ typedef void(*PercentageChangedCallback)(const float oldValue, const float newVa
 
 typedef void(*IsChargingChangedCallback)(const bool oldIsCharging, const bool newIsCharging);
 
-extern BatteryError battery_init();
+extern Error battery_init();
 
 extern void battery_setSampleCount(const uint samplesCount);
 
@@ -27,7 +27,7 @@ extern float battery_getPercentage();
 
 extern float battery_getVoltage();
 
-extern BatteryError battery_getInfo(BatteryInfo *batteryInfo);
+extern Error battery_getInfo(BatteryInfo *batteryInfo);
 
 extern void battery_addOnPercentageChangedCallback(PercentageChangedCallback percentageChangedCallback);
 

@@ -37,9 +37,9 @@ private struct {
     } task;
 } this;
 
-private StorageError externalStorage_mountSDCard() {
+private Error externalStorage_mountSDCard() {
     const atomic_bool isMounted = atomic_load(&this.isMounted);
-    if (isMounted) return STORAGE_ERROR_NONE;
+    if (isMounted) return ERROR_NONE;
     sdspi_device_config_t deviceConfig = SDSPI_DEVICE_CONFIG_DEFAULT();
     deviceConfig.gpio_cs = 15;
     deviceConfig.host_id = this.sdmmcHost->slot;
@@ -58,10 +58,9 @@ private StorageError externalStorage_mountSDCard() {
     if (err == ESP_OK) {
         atomic_store(&this.isMounted, true);
     } else {
-        throw(STORAGE_ERROR_GENERIC_FAILURE,
-              "mount() returned: %i: %s", err, esp_err_to_name(err));
+        throwESPError(esp_vfs_fat_sdspi_mount, err);
     }
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
 private void externalStorage_autoMountTaskFunction(void *arg);
@@ -113,12 +112,12 @@ private void externalStorage_autoMountTaskFunction(void *arg) {
 
 /*============================= Public API ==================================*/
 
-public StorageError externalStorage_init(ExternalStorageOptions *externalStorageOptions) {
+public Error externalStorage_init(ExternalStorageOptions *externalStorageOptions) {
     if (this.isInitialized) {
         WARN("ExternalStorage has already been initialized");
-        return STORAGE_ERROR_NONE;
+        return ERROR_NONE;
     }
-    requireNotNull(externalStorageOptions, STORAGE_ERROR_INVALID_PARAMETER, "externalStorageOptions cannot be NULL");
+    requireArgNotNull(externalStorageOptions);
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     this.sdmmcHost = new(sdmmc_host_t);
     memcpy(this.sdmmcHost, &host, sizeof(sdmmc_host_t));
@@ -158,16 +157,16 @@ public StorageError externalStorage_init(ExternalStorageOptions *externalStorage
     }
 
     this.isInitialized = true;
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError externalStorage_destroy() {
+public Error externalStorage_destroy() {
     if (!this.isInitialized) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "External Storage was not initialized, cannot destroy");
+        throw(ERROR_NOT_INITIALIZED, "External Storage was not initialized, cannot destroy");
     }
     const atomic_bool isMounted = atomic_load(&this.isMounted);
     if (isMounted) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "Cannot destroy External Storage while mounted, unmount!");
+        throw(ERROR_ILLEGAL_STATE, "Cannot destroy External Storage while mounted, unmount!");
     }
     if (this.task.isRunning) {
         this.task.isRunning = false;
@@ -177,25 +176,25 @@ public StorageError externalStorage_destroy() {
             retries++;
         }
         if (retries >= AUTOMOUNT_KILL_RETRY_ATTEMPTS) {
-            throw(STORAGE_ERROR_GENERIC_FAILURE, "Couldn't kill automount task");
+            throw(ERROR_ILLEGAL_STATE, "Couldn't kill automount task");
         }
     }
     spi_bus_free(this.sdmmcHost->slot);
     this.isInitialized = false;
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError externalStorage_unmountSDCard() {
+public Error externalStorage_unmountSDCard() {
     const atomic_bool isMounted = atomic_load(&this.isMounted);
     if (!isMounted) {
-        return STORAGE_ERROR_NONE;
+        return ERROR_NONE;
     }
     esp_err_t err = esp_vfs_fat_sdcard_unmount(SD_CARD_PATH, this.card);
     INFO("unmount() returned: %i: %s", err, esp_err_to_name(err));
     if (err == ESP_OK) {
         atomic_store(&this.isMounted, false);
     }
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
 public bool externalStorage_hasSDCard() {
@@ -204,19 +203,19 @@ public bool externalStorage_hasSDCard() {
     return cardDetectPinLevel;
 }
 
-public StorageError externalStorage_getStorageInfo(StorageInfo *storageInfo) {
-    requireParamNotNull(storageInfo);
+public Error externalStorage_getStorageInfo(StorageInfo *storageInfo) {
+    requireArgNotNull(storageInfo);
     const atomic_bool isMounted = atomic_load(&this.isMounted);
     if (!this.card || !this.hasSDCard || !isMounted) {
-        throw(STORAGE_ERROR_PARTITION_NOT_FOUND, "Cannot query storage info, card is not present and/or not mounted");
+        throw(ERROR_NOT_FOUND, "Cannot query storage info, card is not present and/or not mounted");
     }
     DWORD freeClusters;
     FATFS *fatfs = NULL;
     FRESULT fresult = f_getfree(SD_CARD_PATH, &freeClusters, &fatfs);
     if (fresult != FR_OK) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "f_getfree() returned %i: %s", fresult, fresultToString(fresult));
+        throw(ERROR_LIBRARY_FAILURE, "f_getfree() returned %i: %s", fresult, fresultToString(fresult));
     }
-    requireNotNull(fatfs, STORAGE_ERROR_INVALID_PARAMETER,
+    requireNotNull(fatfs, ERROR_LIBRARY_FAILURE,
                    "f_getfree() did not modify FATFS pointer which is NULL");
     uint64_t freeBytes = ((uint64_t) freeClusters) * ((uint64_t) fatfs->csize) * ((uint64_t) (fatfs->ssize));
     uint64_t totalBytes = ((uint64_t) fatfs->n_fatent - 2) * ((uint64_t) fatfs->csize) * ((uint64_t) (fatfs->ssize));
@@ -225,54 +224,54 @@ public StorageError externalStorage_getStorageInfo(StorageInfo *storageInfo) {
     storageInfo->totalBytes = totalBytes;
     storageInfo->usedBytes = usedBytes;
     storageInfo->freeBytes = freeBytes;
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
 /*============================= Directories =================================*/
 
-public StorageError externalStorage_queryDirExists(const char *dirPath, bool *dirExists) {
-    requireParamNotNull(dirPath);
-    requireParamNotNull(dirExists);
+public Error externalStorage_queryDirExists(const char *dirPath, bool *dirExists) {
+    requireArgNotNull(dirPath);
+    requireArgNotNull(dirExists);
     getPath(path, dirPath);
 
     return storage_queryDirExists(path, dirExists);
 }
 
 // TODO: 11-Sep-2022 @basshelal: This will probably be deleted!
-public StorageError externalStorage_queryDirInfo(const char *dirPath, DirInfo *dirInfo) {
-    requireParamNotNull(dirPath);
-    requireParamNotNull(dirInfo);
+public Error externalStorage_queryDirInfo(const char *dirPath, DirInfo *dirInfo) {
+    requireArgNotNull(dirPath);
+    requireArgNotNull(dirInfo);
     getPath(path, dirPath);
 
     return storage_queryDirInfo(path, dirInfo);
 }
 
-public StorageError externalStorage_createDir(const char *dirPath) {
-    requireParamNotNull(dirPath);
+public Error externalStorage_createDir(const char *dirPath) {
+    requireArgNotNull(dirPath);
     getPath(path, dirPath);
 
     return storage_createDir(path);
 }
 
-public StorageError externalStorage_readDir(const char *dirPath, char **dirEntries, size_t *entryCount) {
-    requireParamNotNull(dirPath);
-    requireParamNotNull(entryCount);
+public Error externalStorage_readDir(const char *dirPath, char **dirEntries, size_t *entryCount) {
+    requireArgNotNull(dirPath);
+    requireArgNotNull(entryCount);
     getPath(path, dirPath);
 
     return storage_readDir(path, dirEntries, entryCount);
 }
 
-public StorageError externalStorage_moveDir(const char *dirPath, const char *newDirPath) {
-    requireParamNotNull(dirPath);
-    requireParamNotNull(newDirPath);
+public Error externalStorage_moveDir(const char *dirPath, const char *newDirPath) {
+    requireArgNotNull(dirPath);
+    requireArgNotNull(newDirPath);
     getPath(oldPath, dirPath);
     getPath(newPath, newDirPath);
 
     return storage_moveDir(oldPath, newPath);
 }
 
-public StorageError externalStorage_deleteDir(const char *dirPath) {
-    requireParamNotNull(dirPath);
+public Error externalStorage_deleteDir(const char *dirPath) {
+    requireArgNotNull(dirPath);
     getPath(path, dirPath);
 
     return storage_deleteDir(path);
@@ -280,65 +279,64 @@ public StorageError externalStorage_deleteDir(const char *dirPath) {
 
 /*============================= Files =======================================*/
 
-public StorageError externalStorage_queryFileExists(const char *filePath,
-                                                    bool *fileExists) {
-    requireParamNotNull(filePath);
-    requireParamNotNull(fileExists);
+public Error externalStorage_queryFileExists(const char *filePath, bool *fileExists) {
+    requireArgNotNull(filePath);
+    requireArgNotNull(fileExists);
     getPath(path, filePath);
 
     return storage_queryFileExists(path, fileExists);
 }
 
-public StorageError externalStorage_queryFileInfo(const char *filePath, FileInfo *fileInfo) {
-    requireParamNotNull(filePath);
-    requireParamNotNull(fileInfo);
+public Error externalStorage_queryFileInfo(const char *filePath, FileInfo *fileInfo) {
+    requireArgNotNull(filePath);
+    requireArgNotNull(fileInfo);
     getPath(path, filePath);
 
     return storage_queryFileInfo(path, fileInfo);
 }
 
-public StorageError externalStorage_createFile(const char *filePath) {
-    requireParamNotNull(filePath);
+public Error externalStorage_createFile(const char *filePath) {
+    requireArgNotNull(filePath);
     getPath(path, filePath);
 
     return storage_createFile(path);
 }
 
-public StorageError externalStorage_openFile(const char *filePath, FILE **fileIn, const FileMode fileMode) {
-    requireParamNotNull(filePath);
-    requireParamNotNull(fileIn);
+public Error externalStorage_openFile(const char *filePath, FILE **fileIn, const FileMode fileMode) {
+    requireArgNotNull(filePath);
+    requireArgNotNull(fileIn);
     getPath(path, filePath);
 
     return storage_openFile(path, fileIn, fileMode);
 }
 
-public StorageError externalStorage_closeFile(const FILE *fileIn) {
-    requireParamNotNull(fileIn);
+public Error externalStorage_closeFile(const FILE *fileIn) {
+    requireArgNotNull(fileIn);
 
     return storage_closeFile(fileIn);
 }
 
-public StorageError externalStorage_readFile(const FILE *file, const size_t startPosition,
-                                             void *bufferIn, const uint bufferLength, uint *bytesRead) {
-    requireParamNotNull(file);
-    requireParamNotNull(bufferIn);
-    requireParamNotNull(bytesRead);
+public Error externalStorage_readFile(const FILE *file, const size_t startPosition,
+                                      void *bufferIn, const uint bufferLength, uint *bytesRead) {
+    requireArgNotNull(file);
+    requireArgNotNull(bufferIn);
+    requireArgNotNull(bytesRead);
 
     return storage_readFile(file, startPosition, bufferIn, bufferLength, bytesRead);
 }
 
-public StorageError externalStorage_writeFile(const FILE *file, const size_t startPosition,
-                                              const void *buffer, const uint bufferLength, uint *bytesWritten) {
-    requireParamNotNull(file);
-    requireParamNotNull(buffer);
-    requireParamNotNull(bytesWritten);
+public Error externalStorage_writeFile(const FILE *file, const size_t startPosition,
+                                       const void *buffer, const uint bufferLength, uint *bytesWritten) {
+    requireArgNotNull(file);
+    requireArgNotNull(buffer);
+    requireArgNotNull(bytesWritten);
 
     return storage_writeFile(file, startPosition, buffer, bufferLength, bytesWritten);
 }
 
-public StorageError externalStorage_moveFile(const char *filePath, const char *newFilePath) {
-    requireParamNotNull(filePath);
-    requireParamNotNull(newFilePath);
+public Error externalStorage_moveFile(const char *filePath, const char *newFilePath) {
+    requireArgNotNull(filePath);
+    requireArgNotNull(newFilePath);
 
     getPath(oldPath, filePath);
     getPath(newPath, newFilePath);
@@ -346,8 +344,8 @@ public StorageError externalStorage_moveFile(const char *filePath, const char *n
     return storage_moveFile(oldPath, newPath);
 }
 
-public StorageError externalStorage_deleteFile(const char *filePath) {
-    requireParamNotNull(filePath);
+public Error externalStorage_deleteFile(const char *filePath) {
+    requireArgNotNull(filePath);
 
     getPath(path, filePath);
 

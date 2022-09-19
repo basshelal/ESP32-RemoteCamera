@@ -32,7 +32,7 @@ extern LogList *logList_create(const LogListOptions *options);
 
 extern void logList_append(LogList *logList, const char *string);
 
-extern ListError logList_getList(LogList *logList, List *listIn);
+extern Error logList_getList(LogList *logList, List *listIn);
 
 extern unsigned int logList_getCapacity(LogList *logList);
 

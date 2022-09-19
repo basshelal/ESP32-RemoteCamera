@@ -19,10 +19,10 @@ private struct {
     bool isInitialized;
 } this;
 
-public StorageError internalStorage_init() {
+public Error internalStorage_init() {
     if (this.isInitialized) {
         WARN("Internal storage has already initialized!");
-        return STORAGE_ERROR_NONE;
+        return ERROR_NONE;
     }
     VERBOSE("Initializing internal storage");
     const esp_vfs_spiffs_conf_t conf = {
@@ -33,20 +33,20 @@ public StorageError internalStorage_init() {
     };
     esp_err_t err = esp_vfs_spiffs_register(&conf);
     if (err == ESP_ERR_NOT_FOUND) {
-        throw(STORAGE_ERROR_PARTITION_NOT_FOUND, "Partition for SPIFFS was not found");
+        throw(ERROR_ILLEGAL_ARGUMENT, "Partition for SPIFFS was not found");
     } else if (err == ESP_ERR_INVALID_STATE) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "Partition already mounted or encrypted");
+        throw(ERROR_ILLEGAL_STATE, "Partition already mounted or encrypted");
     } else if (err != ESP_OK) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE, "esp_vfs_spiffs_register() returned error: %s", esp_err_to_name(err));
+        throwESPError(esp_vfs_spiffs_register(), err);
     }
     VERBOSE("Successfully initialized internal storage");
     this.isInitialized = true;
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError internalStorage_destroy() {
+public Error internalStorage_destroy() {
     if (!this.isInitialized) {
-        throw(STORAGE_ERROR_GENERIC_FAILURE,
+        throw(ERROR_NOT_INITIALIZED,
               "could not destroy internal storage, internal storage was not initialized");
     }
     VERBOSE("Destroying internal storage");
@@ -56,66 +56,66 @@ public StorageError internalStorage_destroy() {
     }
     VERBOSE("Successfully destroyed internal storage");
     this.isInitialized = false;
-    return STORAGE_ERROR_NONE;
+    return ERROR_NONE;
 }
 
-public StorageError internalStorage_queryFileExists(const char *filePath, bool *fileExists) {
-    requireParamNotNull(filePath);
+public Error internalStorage_queryFileExists(const char *filePath, bool *fileExists) {
+    requireArgNotNull(filePath);
     getPath(path, filePath);
 
     return storage_queryFileExists(path, fileExists);
 }
 
-public StorageError internalStorage_queryFileInfo(const char *filePath, FileInfo *fileInfo) {
-    requireParamNotNull(filePath);
-    requireParamNotNull(fileInfo);
+public Error internalStorage_queryFileInfo(const char *filePath, FileInfo *fileInfo) {
+    requireArgNotNull(filePath);
+    requireArgNotNull(fileInfo);
     getPath(path, filePath);
 
     return storage_queryFileInfo(path, fileInfo);
 }
 
-public StorageError internalStorage_createFile(const char *filePath) {
-    requireParamNotNull(filePath);
+public Error internalStorage_createFile(const char *filePath) {
+    requireArgNotNull(filePath);
     getPath(path, filePath);
 
     return storage_createFile(path);
 }
 
-public StorageError internalStorage_openFile(const char *filePath, FILE **fileIn, const FileMode fileMode) {
-    requireParamNotNull(filePath);
-    requireParamNotNull(fileIn);
+public Error internalStorage_openFile(const char *filePath, FILE **fileIn, const FileMode fileMode) {
+    requireArgNotNull(filePath);
+    requireArgNotNull(fileIn);
     getPath(path, filePath);
 
     return storage_openFile(path, fileIn, fileMode);
 }
 
-public StorageError internalStorage_closeFile(const FILE *file) {
-    requireParamNotNull(file);
+public Error internalStorage_closeFile(const FILE *file) {
+    requireArgNotNull(file);
 
     return storage_closeFile(file);
 }
 
-public StorageError internalStorage_readFile(const FILE *file, const size_t startPosition,
-                                             void *bufferIn, const uint bufferLength, uint *bytesRead) {
-    requireParamNotNull(file);
-    requireParamNotNull(bufferIn);
-    requireParamNotNull(bytesRead);
+public Error internalStorage_readFile(const FILE *file, const size_t startPosition,
+                                      void *bufferIn, const uint bufferLength, uint *bytesRead) {
+    requireArgNotNull(file);
+    requireArgNotNull(bufferIn);
+    requireArgNotNull(bytesRead);
 
     return storage_readFile(file, startPosition, bufferIn, bufferLength, bytesRead);
 }
 
-public StorageError internalStorage_writeFile(const FILE *file, const size_t startPosition,
-                                              const void *buffer, const uint bufferLength, uint *bytesWritten) {
-    requireParamNotNull(file);
-    requireParamNotNull(buffer);
-    requireParamNotNull(bytesWritten);
+public Error internalStorage_writeFile(const FILE *file, const size_t startPosition,
+                                       const void *buffer, const uint bufferLength, uint *bytesWritten) {
+    requireArgNotNull(file);
+    requireArgNotNull(buffer);
+    requireArgNotNull(bytesWritten);
 
     return storage_writeFile(file, startPosition, buffer, bufferLength, bytesWritten);
 }
 
-public StorageError internalStorage_moveFile(const char *filePath, const char *newFilePath) {
-    requireParamNotNull(filePath);
-    requireParamNotNull(newFilePath);
+public Error internalStorage_moveFile(const char *filePath, const char *newFilePath) {
+    requireArgNotNull(filePath);
+    requireArgNotNull(newFilePath);
 
     getPath(oldPath, filePath);
     getPath(newPath, newFilePath);
@@ -123,8 +123,8 @@ public StorageError internalStorage_moveFile(const char *filePath, const char *n
     return storage_moveFile(oldPath, newPath);
 }
 
-public StorageError internalStorage_deleteFile(const char *filePath) {
-    requireParamNotNull(filePath);
+public Error internalStorage_deleteFile(const char *filePath) {
+    requireArgNotNull(filePath);
     getPath(path, filePath);
 
     return storage_deleteFile(path);

@@ -114,14 +114,14 @@ testCase("non existent dir query exists") {
 
 testCase("non existent dir query info") {
     DirInfo dirInfo = {.sizeBytes = UINT_MAX};
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    externalStorage_queryDirInfo(testDirName, &dirInfo));
     assertEqualUInt(UINT_MAX, dirInfo.sizeBytes); // no change if failed
 }
 
 testCase("non existent dir read") {
     size_t entryCount = SIZE_MAX;
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    externalStorage_readDir(testDirName, NULL, &entryCount));
     assertEqualUInt(0, entryCount); // 0 only if dir wasn't found
 
@@ -131,7 +131,7 @@ testCase("non existent dir read") {
         assertNull(dirEntries[i]);
     }
     entryCount = SIZE_MAX;
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    externalStorage_readDir(testDirName, dirEntries, &entryCount));
     assertEqualUInt(0, entryCount); // 0 only if dir wasn't found
     for (int i = 0; i < testEntryCount; i++) {
@@ -141,12 +141,12 @@ testCase("non existent dir read") {
 }
 
 testCase("non existent dir move") {
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    externalStorage_moveDir(testDirName, "newTestDir"));
 }
 
 testCase("non existent dir delete") {
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    externalStorage_deleteDir(testDirName));
 }
 
@@ -224,20 +224,20 @@ testCase("non existent file query exists") {
 testCase("non existent file query info") {
     FileInfo fileInfo;
     fileInfo.sizeBytes = UINT_MAX;
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    externalStorage_queryFileInfo(testFileName, &fileInfo));
     assertEqualUInt(UINT_MAX, fileInfo.sizeBytes); // no change if failed
 }
 
 testCase("non existent file open") {
     FILE *file;
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    externalStorage_openFile(testFileName, &file, FILE_MODE_WRITE));
 }
 
 testCase("non existent file close") {
     FILE *file = NULL;
-    assertEqualInt(STORAGE_ERROR_INVALID_PARAMETER,
+    assertEqualInt(ERROR_NULL_ARGUMENT,
                    externalStorage_closeFile(file));
 }
 
@@ -249,7 +249,7 @@ testCase("non existent file read") {
         assertEqualChar(0, buffer[i]);
     }
     uint bytesRead = UINT_MAX;
-    assertEqualInt(STORAGE_ERROR_INVALID_PARAMETER,
+    assertEqualInt(ERROR_NULL_ARGUMENT,
                    externalStorage_readFile(file, /*startPosition=*/0, buffer, bufferSize, &bytesRead));
     for (int i = 0; i < bufferSize; i++) {
         assertEqualChar(0, buffer[i]); // no change if failed
@@ -263,19 +263,19 @@ testCase("non existent file write") {
     const uint bufferSize = 512;
     char *buffer = calloc(bufferSize, sizeof(char));
     uint bytesWritten = UINT_MAX;
-    assertEqualInt(STORAGE_ERROR_INVALID_PARAMETER,
+    assertEqualInt(ERROR_NULL_ARGUMENT,
                    externalStorage_writeFile(file, /*startPosition=*/0, buffer, bufferSize, &bytesWritten));
     assertEqualUInt(UINT_MAX, bytesWritten); // no change if failed
     free(buffer);
 }
 
 testCase("non existent file move") {
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    externalStorage_moveFile(testFileName, newTestFileName));
 }
 
 testCase("non existent file delete") {
-    assertEqualInt(STORAGE_ERROR_NOT_FOUND,
+    assertEqualInt(ERROR_NOT_FOUND,
                    externalStorage_deleteFile(testFileName));
 }
 

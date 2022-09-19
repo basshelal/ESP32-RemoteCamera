@@ -21,5 +21,6 @@ typedef unsigned long ulong;
 #define new(type) calloc(1, sizeof(type))
 
 #define boolToString(boolValue) boolValue ? "true" : "false"
+#define asString(codeName) #codeName
 
 #endif //ESP32_REMOTECAMERA_UTILS_H
