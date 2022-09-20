@@ -4,7 +4,7 @@
 #include "esp_http_server.h"
 #include "Logger.h"
 #include "InternalStorage.h"
-#include "FileMode.h"
+#include "ExternalStorage.h"
 #include "cJSON.h"
 #include "Battery.h"
 
@@ -42,7 +42,7 @@ requestHandler(NULL, 404) {
     return ESP_OK;
 }
 
-requestHandler("/pages", pages) {
+requestHandler("/pages*", pages) {
     allowCORS(request);
     INFO("URI: %s", request->uri);
     httpd_resp_set_status(request, HTTPD_200);
@@ -206,6 +206,25 @@ requestHandler("/socket/log", socketLog) {
     return ESP_OK;
 }
 
+requestHandler("/files/*", files) {
+    allowCORS(request);
+    INFO("URI: %s", request->uri);
+
+    // TODO: 19-Sep-2022 @basshelal: Trim the leading "/files/" then you need to convert the URL
+    //  if it contains escape/special characters ie %20 representing a space, probably need a library to convert
+    //  to and from if files are saved with these characters and if URL contains them
+    //  maybe use this library https://github.com/uriparser/uriparser
+
+    const int prefixLength = strlen("/files/");
+    char *uriCopy = alloc(strlen(request->uri) - prefixLength + 1);
+    strcpy(uriCopy, request->uri + prefixLength);
+
+    INFO("%s", uriCopy);
+
+    httpd_resp_sendstr(request, uriCopy);
+    return ESP_OK;
+}
+
 private void sendLogToWebSocketClients(void *arg) {
     WebsocketAsyncData *asyncDataLocal = (WebsocketAsyncData *) arg;
     if (!asyncDataLocal || !asyncDataLocal->socketsList) return;
@@ -243,7 +262,7 @@ private void onAppendCallback(const LogList *_logList, const char *string) {
     httpd_queue_work(server, sendLogToWebSocketClients, asyncData);
 }
 
-public WebserverError webserver_init() {
+public Error webserver_init() {
     esp_err_t err;
     server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -252,10 +271,9 @@ public WebserverError webserver_init() {
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     INFO("Starting Web Server on port: '%d'", config.server_port);
-    err = httpd_start(&server, &config);
-    if (err != ESP_OK) {
-        ERROR("Failed to start Web Server! %i %s", err, esp_err_to_name(err));
-        return WEBSERVER_ERROR_GENERIC_FAILURE;
+
+    if ((err = httpd_start(&server, &config))) {
+        throwESPError(httpd_start(), err);
     }
 
     httpd_uri_t favIconHandler = {.uri= "/pages/favicon.*", .method= HTTP_GET, .handler= requestHandler_favIcon};
@@ -277,6 +295,9 @@ public WebserverError webserver_init() {
             .is_websocket= true};
     httpd_register_uri_handler(server, &logSocketHandler);
 
+    httpd_uri_t filesApiHandler = {.uri= "/files/*", .method= HTTP_GET, .handler= requestHandler_files};
+    httpd_register_uri_handler(server, &filesApiHandler);
+
     httpd_uri_t rootHandler = {.uri= "/", .method= HTTP_GET, .handler= requestHandler_pages};
     httpd_register_uri_handler(server, &rootHandler);
 
@@ -294,5 +315,5 @@ public WebserverError webserver_init() {
     socketsListOptions.capacity = CONFIG_LWIP_MAX_SOCKETS;
     asyncData->socketsList = list_createWithOptions(&socketsListOptions);
 
-    return WEBSERVER_ERROR_NONE;
+    return ERROR_NONE;
 }

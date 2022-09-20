@@ -125,7 +125,7 @@ public Error storage_readDir(const char *dirPath, char **dirEntries, size_t *ent
     struct dirent *entry;
     while ((entry = readdir(dir))) {
         if (fillEntries) {
-            dirEntries[entries] = alloc(sizeof(char) * strlen(entry->d_name));
+            dirEntries[entries] = stralloc(strlen(entry->d_name));
             strcpy(dirEntries[entries], entry->d_name);
         }
         entries++;
@@ -160,33 +160,20 @@ public Error storage_deleteDir(const char *dirPath) {
 /*============================= Files =======================================*/
 
 public Error storage_queryFileExists(const char *filePath, bool *fileExists) {
-    return storage_queryFileExistsStat(filePath, fileExists);
+    return storage_queryFileExistsOpen(filePath, fileExists);
 }
 
-public Error storage_queryFileExistsAccess(const char *filePath, bool *fileExists) {
-    if (access(filePath, F_OK) == 0) {
+public Error storage_queryFileExistsOpen(const char *filePath, bool *fileExists) {
+    FILE *file = NULL;
+    if ((file = fopen(filePath, fileModeToString(FILE_MODE_READ)))) {
         *fileExists = true;
+        fclose(file);
     } else {
         int err = errno;
         if (errno == ENOENT) {
             *fileExists = false;
         } else {
-            throwLibCError(access(), err);
-        }
-    }
-    return ERROR_NONE;
-}
-
-public Error storage_queryFileExistsStat(const char *filePath, bool *fileExists) {
-    struct stat statResult;
-    if (stat(filePath, &statResult) == 0) {
-        *fileExists = true;
-    } else {
-        int err = errno;
-        if (errno == ENOENT) {
-            *fileExists = false;
-        } else {
-            throwLibCError(stat(), err);
+            throwLibCError(fopen(), err);
         }
     }
     return ERROR_NONE;

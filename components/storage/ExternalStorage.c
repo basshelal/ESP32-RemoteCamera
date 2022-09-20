@@ -227,6 +227,24 @@ public Error externalStorage_getStorageInfo(StorageInfo *storageInfo) {
     return ERROR_NONE;
 }
 
+public Error externalStorage_queryPathType(const char *path, bool *isDir, bool *isFile) {
+    requireArgNotNull(path);
+    requireArgNotNull(isDir);
+    requireArgNotNull(isFile);
+
+    getPath(fullPath, path);
+
+    throwIfError(storage_queryFileExists(fullPath, isFile),
+                 "Could not get type for path: %s", path);
+    throwIfError(storage_queryDirExists(fullPath, isDir),
+                 "Could not get type for path: %s", path);
+    if (*isDir && *isFile) {
+        throw(ERROR_ILLEGAL_STATE, "Returned both dir and file for path: %s", path);
+    }
+
+    return ERROR_NONE;
+}
+
 /*============================= Directories =================================*/
 
 public Error externalStorage_queryDirExists(const char *dirPath, bool *dirExists) {

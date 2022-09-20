@@ -32,6 +32,8 @@ extern bool externalStorage_hasSDCard();
 
 extern Error externalStorage_getStorageInfo(StorageInfo *storageInfo);
 
+extern Error externalStorage_queryPathType(const char *path, bool *isDir, bool *isFile);
+
 /*============================= Directories =================================*/
 
 extern Error externalStorage_queryDirExists(const char *dirPath, bool *dirExists);

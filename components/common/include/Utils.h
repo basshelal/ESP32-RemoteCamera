@@ -18,6 +18,7 @@ typedef unsigned int uint;
 typedef unsigned long ulong;
 
 #define alloc(size) calloc(size, sizeof(char))
+#define stralloc(strlen) alloc(((strlen) * sizeof(char)) + 1)
 #define new(type) calloc(1, sizeof(type))
 
 #define boolToString(boolValue) boolValue ? "true" : "false"

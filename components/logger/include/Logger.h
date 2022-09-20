@@ -79,6 +79,9 @@ throw(ERROR_LIBRARY_FAILURE, #functionName" returned: %i: %s", err, esp_err_to_n
 #define throwLibCError(functionName, errno) \
 throw(ERROR_LIBRARY_FAILURE, #functionName" returned: %i: %s", err, strerror(err))
 
+#define throwLibCErrorMessage(functionName, errno, message, ...) \
+throw(ERROR_LIBRARY_FAILURE, #functionName" returned: %i: %s " message, err, strerror(err), ##__VA_ARGS__)
+
 #define require(condition, error, message, ...) \
 do{                                                  \
 if (!(condition)) {                                  \

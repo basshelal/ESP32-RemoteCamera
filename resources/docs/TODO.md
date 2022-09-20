@@ -1,5 +1,35 @@
 # TODO
 
+## WebServer
+* URI Parser to decode URIs with `%20` instead of space for example
+* GET View SD Card files
+* GET/POST Delete SD Card files
+
+## Camera
+* Take pictures and or videos, use the webserver and or SD card to check these
+* Camera settings modification, if these are useful to user then user needs to access and set these
+  permanently using internal storage
+* Take pictures and store to SD Card
+* Take videos and store to SD Card
+* Record continuously live video and encode into HLS livestream, this may be complex enough to require
+  its own component or file. The video data should probably live in memory as storage writes are expensive.
+
+## WiFi
+* WebServer calls WiFi to see if we can get an internet connection:
+  Wifi checks if we have credentials stored to connect with:
+  true then try to connect with them until success or fail
+  false (or after enough retries) then connect into setup-mode where ESP32 is a
+  Wifi access point (and also station) where you can visit the page to view
+  logs and set-up connection to diagnose issues
+  wifi responds, ok if we connect no problem, otherwise maybe no credentials exist on storage
+  thus tells webserver so and then webserver tells wifi to start in STA mode to begin the 
+  setup page server
+* The setup page may have to be in mixed mode, when on the page, scan for Wifi access points for
+  easier user experience, when connected we can check an internet connection to ensure all works
+  an internet connection is generally required or at least preferred, maybe also allow an option
+  for no internet, ie, remote camera that is connected to via its own network
+* Allow (advanced) users to choose and store their desired IP address
+
 ## Generic
 * Create a common `Error` type which every function returns, this enum type contains all possible errors
   and is declared in the `Common` component, it's the best solution to having shared errors
@@ -21,22 +51,6 @@
 * Websocket status and websocket reconnect at the bottom under log
 * We can check websocket status by running a polling function that uses the socket?
 
-## WiFi
-* WebServer calls WiFi to see if we can get an internet connection:
-  Wifi checks if we have credentials stored to connect with:
-  true then try to connect with them until success or fail
-  false (or after enough retries) then connect into setup-mode where ESP32 is a
-  Wifi access point (and also station) where you can visit the page to view
-  logs and set-up connection to diagnose issues
-  wifi responds, ok if we connect no problem, otherwise maybe no credentials exist on storage
-  thus tells webserver so and then webserver tells wifi to start in STA mode to begin the 
-  setup page server
-* The setup page may have to be in mixed mode, when on the page, scan for Wifi access points for
-  easier user experience, when connected we can check an internet connection to ensure all works
-  an internet connection is generally required or at least preferred, maybe also allow an option
-  for no internet, ie, remote camera that is connected to via its own network
-* Allow (advanced) users to choose and store their desired IP address
-
 ## WebServer
 * Begin Wi-Fi connection, see if we can use a static IP
 * Add CJSON library for easy web request handling
@@ -44,19 +58,6 @@
 * GET app routes responding to preact router, likely prefixed with `/app/*`
 * GET HLS live stream resource, this can initially be a public HLS for testing purposes.
   (The HLS encoding from Camera to WebServer may be complex and need its own component)
-
-## WebServer
-* GET View SD Card files
-* GET/POST Delete SD Card files
-
-## Camera
-* Take pictures and or videos, use the webserver and or SD card to check these
-* Camera settings modification, if these are useful to user then user needs to access and set these
-  permanently using internal storage
-* Take pictures and store to SD Card
-* Take videos and store to SD Card
-* Record continuously live video and encode into HLS livestream, this may be complex enough to require
-  its own component or file. The video data should probably live in memory as storage writes are expensive.
 
 ## Setup
 * Setup includes a reset button (and software switch) to reset device to factory defaults

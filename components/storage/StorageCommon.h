@@ -36,9 +36,7 @@ extern Error storage_deleteDir(const char *dirPath);
 
 extern Error storage_queryFileExists(const char *filePath, bool *fileExists);
 
-extern Error storage_queryFileExistsAccess(const char *filePath, bool *fileExists);
-
-extern Error storage_queryFileExistsStat(const char *filePath, bool *fileExists);
+extern Error storage_queryFileExistsOpen(const char *filePath, bool *fileExists);
 
 extern Error storage_queryFileInfo(const char *filePath, FileInfo *fileInfo);
 

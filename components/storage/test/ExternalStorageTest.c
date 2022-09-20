@@ -21,67 +21,87 @@ private inline char **createEmptyStringArray(const uint size) {
     return array;
 }
 
-private inline void clearDir(const char *dirName) {
+private inline void clearDir(const char *dirPath) {
     bool dirExists;
-    assertOK(externalStorage_queryDirExists(dirName, &dirExists));
+    assertOK(externalStorage_queryDirExists(dirPath, &dirExists));
     if (dirExists) {
         size_t entryCount;
-        assertOK(externalStorage_readDir(dirName, NULL, &entryCount));
-        char **dirEntries = malloc(entryCount * sizeof(char));
-        assertOK(externalStorage_readDir(dirName, dirEntries, &entryCount));
+        assertOK(externalStorage_readDir(dirPath, NULL, &entryCount));
+        char **dirEntries = alloc(entryCount * sizeof(char *));
+        assertOK(externalStorage_readDir(dirPath, dirEntries, &entryCount));
         char buffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
         for (int i = 0; i < entryCount; i++) {
             const char *entry = dirEntries[i];
             if (entry != NULL) {
-                sprintf(buffer, "%s/%s", dirName, entry);
+                sprintf(buffer, "%s/%s", dirPath, entry);
                 assertOK(externalStorage_deleteFile(buffer));
             }
         }
-        assertOK(externalStorage_readDir(dirName, NULL, &entryCount));
+        assertOK(externalStorage_readDir(dirPath, NULL, &entryCount));
         assertEqualUInt(0, entryCount);
     }
 }
 
-private inline void fillDir(const char *dirName, const uint fileCount, const uint dirCount) {
+private inline void fillDir(const char *dirPath, const uint fileCount, const uint dirCount) {
     bool dirExists;
-    externalStorage_queryDirExists(dirName, &dirExists);
+    externalStorage_queryDirExists(dirPath, &dirExists);
     if (!dirExists) {
-        assertOK(externalStorage_createDir(dirName));
-        externalStorage_queryDirExists(dirName, &dirExists);
+        assertOK(externalStorage_createDir(dirPath));
+        externalStorage_queryDirExists(dirPath, &dirExists);
         assertTrue(dirExists);
     }
-    clearDir(dirName);
+    clearDir(dirPath);
     char buffer[EXTERNAL_STORAGE_MAX_PATH_LENGTH];
     for (int i = 0; i < fileCount; i++) {
-        sprintf(buffer, "%s/%s%i", dirName, "testFile", i);
+        sprintf(buffer, "%s/%s%i", dirPath, "testFile", i);
         assertOK(externalStorage_createFile(buffer));
     }
     for (int i = 0; i < dirCount; i++) {
-        sprintf(buffer, "%s/%s%i", dirName, "testDir", i);
+        sprintf(buffer, "%s/%s%i", dirPath, "testDir", i);
         assertOK(externalStorage_createDir(buffer));
     }
     size_t entryCount;
-    assertOK(externalStorage_readDir(dirName, NULL, &entryCount));
+    assertOK(externalStorage_readDir(dirPath, NULL, &entryCount));
     assertEqualUInt(fileCount + dirCount, entryCount);
 }
 
-private inline void ensureNonExistentDir(const char *dirName) {
+private inline void ensureNonExistentDir(const char *dirPath) {
     bool dirExists;
-    externalStorage_queryDirExists(dirName, &dirExists);
+    externalStorage_queryDirExists(dirPath, &dirExists);
     if (dirExists) {
-        assertOK(externalStorage_deleteDir(dirName));
-        externalStorage_queryDirExists(dirName, &dirExists);
+        assertOK(externalStorage_deleteDir(dirPath));
+        externalStorage_queryDirExists(dirPath, &dirExists);
         assertFalse(dirExists);
     }
 }
 
-private inline void ensureNonExistentFile(const char *fileName) {
+private inline void ensureNonExistentFile(const char *filePath) {
     bool fileExists;
-    externalStorage_queryFileExists(fileName, &fileExists);
+    externalStorage_queryFileExists(filePath, &fileExists);
     if (fileExists) {
-        assertOK(externalStorage_deleteFile(fileName));
-        externalStorage_queryFileExists(fileName, &fileExists);
+        assertOK(externalStorage_deleteFile(filePath));
+        externalStorage_queryFileExists(filePath, &fileExists);
         assertFalse(fileExists);
+    }
+}
+
+private inline void ensureDir(const char *dirPath) {
+    bool dirExists;
+    assertOK(externalStorage_queryDirExists(dirPath, &dirExists));
+    if (!dirExists) {
+        assertOK(externalStorage_createDir(dirPath));
+        assertOK(externalStorage_queryDirExists(dirPath, &dirExists));
+        assertTrue(dirExists);
+    }
+}
+
+private inline void ensureFile(const char *filePath) {
+    bool fileExists;
+    assertOK(externalStorage_queryFileExists(filePath, &fileExists));
+    if (!fileExists) {
+        assertOK(externalStorage_createFile(filePath));
+        assertOK(externalStorage_queryFileExists(filePath, &fileExists));
+        assertTrue(fileExists);
     }
 }
 
@@ -367,6 +387,46 @@ testCase("file delete") {
     bool fileExists = true;
     assertOK(externalStorage_queryFileExists(newTestFileName, &fileExists));
     assertFalse(fileExists);
+}
+
+testCase("query path type") {
+    ensureDir(testDirName);
+    ensureFile(testFileName);
+
+    bool isDir, isFile;
+    assertOK(externalStorage_queryPathType(testDirName, &isDir, &isFile));
+    assertTrue(isDir);
+    assertFalse(isFile);
+
+    assertOK(externalStorage_queryPathType(testFileName, &isDir, &isFile));
+    assertTrue(isFile);
+    assertFalse(isDir);
+
+    ensureNonExistentDir(testDirName);
+    ensureNonExistentFile(testFileName);
+}
+
+testCase("read root dir") {
+    clearDir("/");
+    const int fileCount = 5;
+    const int dirCount = 5;
+    fillDir("/", fileCount, dirCount);
+
+    size_t entryCount = SIZE_MAX;
+    assertOK(externalStorage_readDir("/", NULL, &entryCount));
+    assertEqualUInt(fileCount + dirCount, entryCount);
+
+    char **dirEntries = createEmptyStringArray(entryCount);
+    assertOK(externalStorage_readDir("/", dirEntries, &entryCount));
+    for (int i = 0; i < entryCount; i++) {
+        char *entry = dirEntries[i];
+        assertNotNull(entry);
+        free(dirEntries[i]);
+        dirEntries[i] = NULL;
+    }
+    free(dirEntries);
+
+    clearDir("/");
 }
 
 testCase("finish tests") {
