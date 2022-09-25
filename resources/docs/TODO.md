@@ -2,6 +2,9 @@
 
 ## WebServer
 * URI Parser to decode URIs with `%20` instead of space for example
+  use this library https://github.com/uriparser/uriparser
+  and add libraries like here 
+  https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/build-system.html#using-third-party-cmake-projects-with-components
 * GET View SD Card files
 * GET/POST Delete SD Card files
 

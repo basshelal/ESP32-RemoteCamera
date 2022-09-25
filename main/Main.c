@@ -6,7 +6,7 @@
 #include "Battery.h"
 #include "ExternalStorage.h"
 #include "TaskWatcher.h"
-#include "services/Camera.h"
+#include "Camera.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -24,7 +24,6 @@ private void setup() {
     externalStorage_init(&externalStorageOptions);
     camera_init();
     battery_init();
-    camera_read();
 }
 
 attr(__used__) attr(__noreturn__)
@@ -32,6 +31,7 @@ public void app_main() {
     setup();
     while (true) {
         taskWatcher_loop();
+        camera_read();
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

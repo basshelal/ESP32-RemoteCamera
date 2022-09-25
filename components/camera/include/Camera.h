@@ -1,10 +1,11 @@
 #ifndef ESP32_REMOTECAMERA_CAMERA_H
 #define ESP32_REMOTECAMERA_CAMERA_H
 
-#include "Utils.h"
-#include <esp_err.h>
+#include "Error.h"
 
-extern esp_err_t camera_init();
+extern Error camera_init();
+
+extern Error camera_destroy();
 
 extern void camera_read();
 
