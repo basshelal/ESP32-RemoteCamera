@@ -10,12 +10,12 @@
 
 ## Camera
 * Take pictures and or videos, use the webserver and or SD card to check these
-* Camera settings modification, if these are useful to user then user needs to access and set these
-  permanently using internal storage
 * Take pictures and store to SD Card
-* Take videos and store to SD Card
-* Record continuously live video and encode into HLS livestream, this may be complex enough to require
-  its own component or file. The video data should probably live in memory as storage writes are expensive.
+* Take videos and store to SD Card, videos are in MJPEG format, essentially, moving pictures
+* Livestream, is just a constantly updating image canvas that shows the latest image every x milliseconds
+  to give the illusion of a video, for this another websocket can be used
+* Camera settings such as framerate, resolution and possibly some sensor modifications, these
+  need to be persistent
 
 ## WiFi
 * WebServer calls WiFi to see if we can get an internet connection:
@@ -53,14 +53,6 @@
 * Line count and scroll to bottom button under the log
 * Websocket status and websocket reconnect at the bottom under log
 * We can check websocket status by running a polling function that uses the socket?
-
-## WebServer
-* Begin Wi-Fi connection, see if we can use a static IP
-* Add CJSON library for easy web request handling
-* GET Battery voltage and percentage
-* GET app routes responding to preact router, likely prefixed with `/app/*`
-* GET HLS live stream resource, this can initially be a public HLS for testing purposes.
-  (The HLS encoding from Camera to WebServer may be complex and need its own component)
 
 ## Setup
 * Setup includes a reset button (and software switch) to reset device to factory defaults

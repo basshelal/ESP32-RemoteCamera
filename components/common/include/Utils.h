@@ -24,4 +24,6 @@ typedef unsigned long ulong;
 #define boolToString(boolValue) boolValue ? "true" : "false"
 #define asString(codeName) #codeName
 
+#define delayMillis(millis) vTaskDelay(pdMS_TO_TICKS(millis))
+
 #endif //ESP32_REMOTECAMERA_UTILS_H

@@ -150,7 +150,6 @@ private void battery_taskFunction(void *arg) {
             }
             thisPtr->task.previousBatteryInfo.isCharging = thisPtr->task.currentBatteryInfo.isCharging;
         }
-        INFO("%u %.f%% %.fmV", esp_log_timestamp(), previousPercentage, previousVoltage);
         vTaskDelay(pdMS_TO_TICKS(BATTERY_TASK_POLL_MILLIS));
     }
     taskWatcher_notifyTaskStopped(
