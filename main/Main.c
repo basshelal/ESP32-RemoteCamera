@@ -23,7 +23,7 @@ private void setup() {
     externalStorageOptions.startAutoMountTask = true;
     externalStorage_init(&externalStorageOptions);
     battery_init();
-//    camera_init();
+    camera_init();
 }
 
 attr(__used__) attr(__noreturn__)
