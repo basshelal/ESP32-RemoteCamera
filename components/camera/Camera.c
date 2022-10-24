@@ -4,13 +4,13 @@
 #include "OV5642.h"
 #include <driver/spi_master.h>
 #include "driver/i2c.h"
-#include <string.h>
 
 #define WRITE 0x80
 #define READ  0x00
 #define BYTE_TO_BITS 8
 
 #define I2C_MASTER_FREQ_HZ 400000
+#define SPI_MASTER_FREQ_HZ SPI_MASTER_FREQ_8M
 
 /*
  * Arducam is LSB so bits are in the order 76543210, so 1 in bit 1 is 00000010 or 0x02
@@ -47,11 +47,11 @@ private void i2cWrite(const uint16_t registerAddress,
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, OV5642_I2C_DEVICE_ADDRESS_WRITE, true));
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, firstByte, true));
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, secondByte, true));
-    if (sendDataLength > 0) {
+    if (sendDataLength > 0 && sendData != NULL) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write(cmdHandle, sendData, sendDataLength, true));
     }
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_stop(cmdHandle));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_cmd_begin(I2C_NUM_0, cmdHandle, pdMS_TO_TICKS(1000)));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_cmd_begin(I2C_NUM_0, cmdHandle, 1000 / portTICK_RATE_MS));
     i2c_cmd_link_delete(cmdHandle);
 }
 
@@ -61,115 +61,39 @@ private void i2cRead(const uint16_t registerAddress,
     const uint8_t secondByte = registerAddress & 0x00FF;
     i2c_cmd_handle_t cmdHandle = i2c_cmd_link_create();
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_start(cmdHandle));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, OV5642_I2C_DEVICE_ADDRESS_READ, true));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, OV5642_I2C_DEVICE_ADDRESS_WRITE, true));
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, firstByte, true));
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, secondByte, true));
-    if (receiveDataLength > 0) {
+    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_stop(cmdHandle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_cmd_begin(I2C_NUM_0, cmdHandle, 1000 / portTICK_RATE_MS));
+    i2c_cmd_link_delete(cmdHandle);
+    cmdHandle = i2c_cmd_link_create();
+    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_start(cmdHandle));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, OV5642_I2C_DEVICE_ADDRESS_READ, true));
+    if (receiveDataLength > 0 && receiveData != NULL) {
         ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_read(cmdHandle, receiveData, receiveDataLength, I2C_MASTER_NACK));
     }
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_stop(cmdHandle));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_cmd_begin(I2C_NUM_0, cmdHandle, pdMS_TO_TICKS(1000)));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_cmd_begin(I2C_NUM_0, cmdHandle, 1000 / portTICK_RATE_MS));
     i2c_cmd_link_delete(cmdHandle);
 }
 
-#define LITTLETOBIG(x)          ((x<<8)|(x>>8))
-#define SCCB_FREQ               400000                /*!< I2C master frequency*/
-#define WRITE_BIT               I2C_MASTER_WRITE      /*!< I2C master write */
-#define READ_BIT                I2C_MASTER_READ       /*!< I2C master read */
-#define ACK_CHECK_EN            0x1                   /*!< I2C master will check ack from slave*/
-#define ACK_CHECK_DIS           0x0                   /*!< I2C master will not check ack from slave */
-#define ACK_VAL                 0x0                   /*!< I2C ack value */
-#define NACK_VAL                0x1                   /*!< I2C nack value */
-
-private uint8_t new_SCCB_Read(uint8_t slv_addr, uint8_t reg) {
-    uint8_t data = 0;
-    esp_err_t ret = ESP_FAIL;
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (slv_addr << 1) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg, ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-    if (ret != ESP_OK) return -1;
-    cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (slv_addr << 1) | READ_BIT, ACK_CHECK_EN);
-    i2c_master_read_byte(cmd, &data, NACK_VAL);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-    if (ret != ESP_OK) {
-        ERROR("SCCB_Read Failed addr:0x%02x, reg:0x%02x, data:0x%02x, ret:%d", slv_addr, reg, data, ret);
+private void i2cWriteRegistryEntries(const OV5642RegisterEntry *registerEntries) {
+    const OV5642RegisterEntry *next = registerEntries;
+    OV5642RegisterEntry entry = *registerEntries;
+    while (entry.address != 0xFFFF && entry.value != 0xFF) {
+        i2cWrite(entry.address, &entry.value, sizeof(entry.value));
+        next++;
+        entry = *next;
+        delayMillis(1);
     }
-    return data;
 }
 
-private uint8_t new_SCCB_Write(uint8_t slv_addr, uint8_t reg, uint8_t data) {
-    esp_err_t ret = ESP_FAIL;
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (slv_addr << 1) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, data, ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-    if (ret != ESP_OK) {
-        ERROR("SCCB_Write Failed addr:0x%02x, reg:0x%02x, data:0x%02x, ret:%d", slv_addr, reg, data, ret);
-    }
-    return ret == ESP_OK ? 0 : -1;
-}
-
-private uint8_t new_SCCB_Read16(uint8_t slv_addr, uint16_t reg) {
-    uint8_t data = 0;
-    esp_err_t ret = ESP_FAIL;
-    uint16_t reg_htons = LITTLETOBIG(reg);
-    uint8_t *reg_u8 = (uint8_t *) &reg_htons;
-    INFO("first: 0x%x, second: 0x%x", reg_u8[0], reg_u8[1]);
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (slv_addr << 1) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg_u8[0], ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg_u8[1], ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-    if (ret != ESP_OK) return -1;
-    cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (slv_addr << 1) | READ_BIT, ACK_CHECK_EN);
-    i2c_master_read_byte(cmd, &data, NACK_VAL);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-    if (ret != ESP_OK) {
-        ERROR("W [%04x]=%02x fail\n", reg, data);
-    }
-    return data;
-}
-
-private uint8_t new_SCCB_Write16(uint8_t slv_addr, uint16_t reg, uint8_t data) {
-    static uint16_t i = 0;
-    esp_err_t ret = ESP_FAIL;
-    uint16_t reg_htons = LITTLETOBIG(reg);
-    uint8_t *reg_u8 = (uint8_t *) &reg_htons;
-    INFO("first: 0x%x, second: 0x%x", reg_u8[0], reg_u8[1]);
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (slv_addr << 1) | WRITE_BIT, ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg_u8[0], ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, reg_u8[1], ACK_CHECK_EN);
-    i2c_master_write_byte(cmd, data, ACK_CHECK_EN);
-    i2c_master_stop(cmd);
-    ret = i2c_master_cmd_begin(I2C_NUM_0, cmd, 1000 / portTICK_RATE_MS);
-    i2c_cmd_link_delete(cmd);
-    if (ret != ESP_OK) {
-        ERROR("W [%04x]=%02x %d fail\n", reg, data, i++);
-    }
-    return ret == ESP_OK ? 0 : -1;
-}
-
+#define i2cWriteByte(registerAddress, byte) \
+do{                                         \
+const uint8_t value = byte;                 \
+i2cWrite(registerAddress, &value, sizeof(value));\
+} while(0)
 
 private Error camera_setTestRegister(const uint8_t value) {
     esp_err_t err = spiSendOnly(0x00 | WRITE, &value, sizeof(value));
@@ -230,8 +154,22 @@ private Error camera_getDataBusOwner(DataBusOwner *const owner) {
 private Error camera_setHSyncPolarity();
 private Error camera_getHSyncPolarity();
 
-private Error camera_setVSyncPolarity();
-private Error camera_getVSyncPolarity();
+private Error camera_setVSyncPolarity(const bool isVsyncOn) {
+    const uint8_t data = ((uint8_t) (!isVsyncOn)) << 1;
+    esp_err_t err = spiSendOnly(0x03 | WRITE, &data, sizeof(data));
+    ESP_ERROR_CHECK(err);
+    return ERROR_NONE;
+}
+
+private Error camera_getVSyncPolarity(bool *const isVsyncOn) {
+    uint8_t receivedData = 0;
+    esp_err_t err = spiReceiveOnly(0x03 | READ, &receivedData, sizeof(receivedData));
+    ESP_ERROR_CHECK(err);
+
+    const uint8_t vsyncResult = receivedData & 0x02; // vsync is bit 1
+    *isVsyncOn = !((bool) vsyncResult);
+    return ERROR_NONE;
+}
 
 private Error camera_setLCDBacklight();
 private Error camera_getLCDBacklight();
@@ -254,14 +192,14 @@ private Error camera_startCapture() {
 }
 
 private Error camera_resetFIFOWrite() {
-    uint8_t data = 0x010;
+    uint8_t data = 0x10;
     esp_err_t err = spiSendOnly(0x04 | WRITE, &data, sizeof(data));
     ESP_ERROR_CHECK(err);
     return ERROR_NONE;
 }
 
 private Error camera_resetFIFORead() {
-    uint8_t data = 0x020;
+    uint8_t data = 0x20;
     esp_err_t err = spiSendOnly(0x04 | WRITE, &data, sizeof(data));
     ESP_ERROR_CHECK(err);
     return ERROR_NONE;
@@ -275,10 +213,19 @@ private Error camera_getSensorPowerDownIODirection();
 private Error camera_setSensorPowerEnableIODirection();
 private Error camera_getSensorPowerEnableIODirection();
 
-private Error camera_burstFIFORead();
-private Error camera_singleFIFORead();
+private Error camera_burstFIFORead() {
 
-// TODO: 30-Sep-2022 @basshelal: Missing here is LCD Control Register, I need to figure out what it does/means
+    return ERROR_NONE;
+}
+
+private Error camera_singleFIFORead(uint8_t *const byteReceived) {
+    uint8_t receivedData = 0;
+    esp_err_t err = spiReceiveOnly(0x03D | READ, &receivedData, sizeof(receivedData));
+    ESP_ERROR_CHECK(err);
+
+    *byteReceived = receivedData;
+    return ERROR_NONE;
+}
 
 private Error camera_getVersion(uint8_t *const major, uint8_t *const minor) {
     uint8_t receivedData = 0;
@@ -316,7 +263,18 @@ private Error camera_getWriteFIFOSize(uint32_t *const fifoLength) {
     err = spiReceiveOnly(0x44 | READ, &result3, sizeof(result3));
     ESP_ERROR_CHECK(err);
 
-    INFO("Camera FIFO length: %i,%i,%i", result1, result2, result3);
+    result3 &= 0x7F; // 0x44 returns a 7 bit number, ignore bit 7
+
+    INFO("Camera FIFO length: %x,%x,%x", result1, result2, result3);
+
+    //  result 1 |  result 2 | result 3
+    // 0000 1000 | 0010 1100 | 0000 0001
+
+    //      76_808
+    // 0000 0001 | 0010 1100 | 0000 1000
+
+    *fifoLength = (result3 << 16) | (result2 << 8) | (result1 << 0);
+
     return ERROR_NONE;
 }
 
@@ -343,7 +301,7 @@ private Error camera_initBuses() {
     spi_device_interface_config_t spiDeviceConfig = {
             .command_bits = 8,
             .address_bits = 0,
-            .clock_speed_hz = SPI_MASTER_FREQ_8M,
+            .clock_speed_hz = SPI_MASTER_FREQ_HZ,
             .mode = 0,
             .spics_io_num = 5,
             .queue_size = 1,
@@ -385,22 +343,57 @@ private Error camera_initCameraConfig() {
     uint8_t returnValue;
     camera_getTestRegister(&returnValue);
     if (returnValue != testValue) {
-        ERROR("Test register did not return expected result, expected: %u, was %u", testValue, returnValue);
+        ERROR("Test SPI register did not return expected result, expected: %u, was %u", testValue, returnValue);
     }
 
     camera_setDataBusOwner(0x0);
 
-    uint8_t data = 0x01;
-    new_SCCB_Write16(0x3C, 0x00FF, 0x01);
-//    i2cWrite(0x00FF, &data, sizeof(data));
+    i2cWriteByte(0x00FF, 0x01);
 
-    uint8_t vid = new_SCCB_Read16(0x3C, 0x300A);
-//    i2cRead(0x300A, &vid, sizeof(vid));
+    uint8_t versionHigh;
+    i2cRead(OV5642_I2C_REGISTER_CHIP_ID_HIGH, &versionHigh, sizeof(versionHigh));
 
-    uint8_t pid = new_SCCB_Read16(0x3C, 0x300B);
-//    i2cRead(0x300B, &pid, sizeof(pid));
+    uint8_t versionLow;
+    i2cRead(OV5642_I2C_REGISTER_CHIP_ID_LOW, &versionLow, sizeof(versionLow));
 
-    INFO("vid: 0x%x pid: 0x%x", vid, pid);
+    INFO("Chip ID: %x%x", versionHigh, versionLow);
+    if (versionHigh != OV5642_I2C_CHIP_ID_HIGH || versionLow != OV5642_I2C_CHIP_ID_LOW) {
+        ERROR("Version I2C register did not return expected result, expected: (%u, %u), was (%u, %u)",
+              OV5642_I2C_CHIP_ID_HIGH, OV5642_I2C_CHIP_ID_LOW, versionHigh, versionLow);
+    }
+
+    // system reset
+    i2cWriteByte(0x3008, 0x80);
+    delayMillis(100);
+
+    i2cWriteRegistryEntries(OV5642_QVGA_Preview);
+    delayMillis(100);
+
+    i2cWriteRegistryEntries(OV5642_JPEG_Capture_QSXGA);
+    i2cWriteRegistryEntries(OV5642_320x240);
+    delayMillis(100);
+
+    i2cWriteByte(0x3818, 0xa8);
+    delayMillis(100);
+    i2cWriteByte(0x3621, 0x10);
+    delayMillis(100);
+    i2cWriteByte(0x3801, 0xb0);
+    delayMillis(100);
+    i2cWriteByte(0x4407, 0x08);
+    delayMillis(100);
+    i2cWriteByte(0x5888, 0x00);
+    delayMillis(100);
+    i2cWriteByte(0x5000, 0xFF);
+    delayMillis(100);
+
+    // Test Color bar image
+    i2cWriteByte(0x503d, 0x80);
+    delayMillis(100);
+    i2cWriteByte(0x503e, 0x00);
+
+    delayMillis(1000); // Let auto exposure do its thing after changing image settings
+
+    INFO("Camera setup finished");
 
     return ERROR_NONE;
 }
@@ -416,9 +409,38 @@ public Error camera_destroy() {
     return ERROR_NONE;
 }
 
-public void camera_read() {
-//    camera_startCapture();
-//    camera_waitForFIFODone();
-//    camera_getWriteFIFOSize(NULL);
-//    camera_FIFORead();
+public Error camera_readImage(const int chunkSize, CameraReadCallback readCallback, void *userArg) {
+    camera_setVSyncPolarity(false);
+    camera_resetFIFOWrite();
+    camera_resetFIFORead();
+    camera_clearFIFOWriteDoneFlag();
+
+    camera_startCapture();
+    INFO("Starting capture");
+    camera_waitForFIFODone();
+    INFO("Capture finished!");
+
+    uint32_t fifoLength;
+    camera_getWriteFIFOSize(&fifoLength);
+    INFO("FIFO Length: %u", fifoLength);
+
+    char *buffer = alloc(chunkSize);
+
+    uint8_t byte = 0;
+    for (int i = 0, chunkIndex = 0; i < fifoLength; i++, chunkIndex++) {
+        camera_singleFIFORead(&byte);
+//        printf("%x", byte);
+        if (chunkIndex < chunkSize) {
+            buffer[chunkIndex] = (char) byte;
+        }
+
+        if (chunkIndex + 1 == chunkSize || i + 1 == fifoLength) { // reached end of chunk or end of FIFO
+            readCallback(buffer, chunkIndex + 1, userArg);
+            chunkIndex = -1;
+        }
+    }
+
+    free(buffer);
+
+    return ERROR_NONE;
 }

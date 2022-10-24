@@ -93,25 +93,4 @@ throw(error, message, ##__VA_ARGS__);                \
 #define requireArgNotNull(element) \
 requireNotNull(element, ERROR_NULL_ARGUMENT, #element" cannot be NULL")
 
-#define try(errorable) \
-if((error = (errorable)))
-
-#define catch(errorValue) \
-if(error == (errorValue))
-
-inline void ass() {
-
-    Error error;
-    try(logList_getList(NULL, NULL)) {
-        catch(ERROR_NOT_FOUND) {
-
-        }
-        catch(ERROR_OUT_OF_BOUNDS) {
-
-        }
-    }
-
-
-}
-
 #endif //ESP32_REMOTECAMERA_LOGGER_H

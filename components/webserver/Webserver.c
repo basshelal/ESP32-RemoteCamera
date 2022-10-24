@@ -7,6 +7,7 @@
 #include "ExternalStorage.h"
 #include "cJSON.h"
 #include "Battery.h"
+#include "Camera.h"
 
 #define FILE_BUFFER_SIZE 4096
 
@@ -184,6 +185,21 @@ requestHandler("/api/battery", apiBattery) {
     return ESP_OK;
 }
 
+private void cameraReadCallback(char *buffer, int bufferSize, void *userArgs) {
+    httpd_req_t *request = (httpd_req_t *) userArgs;
+    httpd_resp_send_chunk(request, buffer, bufferSize);
+}
+
+requestHandler("/api/camera", apiCamera) {
+    allowCORS(request);
+    httpd_resp_set_type(request, "image/jpeg");
+
+    camera_readImage(1024, cameraReadCallback, request);
+    httpd_resp_send_chunk(request, NULL, 0);
+
+    return ESP_OK;
+}
+
 requestHandler("/socket/log", socketLog) {
     allowCORS(request);
     INFO("URI: %s", request->uri);
@@ -290,6 +306,9 @@ public Error webserver_init() {
 
     httpd_uri_t batteryApiHandler = {.uri= "/api/battery", .method= HTTP_GET, .handler= requestHandler_apiBattery};
     httpd_register_uri_handler(server, &batteryApiHandler);
+
+    httpd_uri_t cameraApiHandler = {.uri= "/api/camera", .method= HTTP_GET, .handler= requestHandler_apiCamera};
+    httpd_register_uri_handler(server, &cameraApiHandler);
 
     httpd_uri_t logSocketHandler = {.uri= "/socket/log", .method= HTTP_GET, .handler= requestHandler_socketLog,
             .is_websocket= true};

@@ -7,15 +7,19 @@
 #define OV5642_I2C_DEVICE_ADDRESS 0x78 // Datasheet says this, i2c_tools says 0x3C so 0x78 == (0x3C << 1)
 #define OV5642_I2C_DEVICE_ADDRESS_READ ((OV5642_I2C_DEVICE_ADDRESS) | 0x01)     // 0x79
 #define OV5642_I2C_DEVICE_ADDRESS_WRITE (OV5642_I2C_DEVICE_ADDRESS)             // 0x78
-#define OV5642_CHIP_ID_HIGH 0x300a
-#define OV5642_CHIP_ID_LOW 0x300b
+#define OV5642_I2C_REGISTER_CHIP_ID_HIGH 0x300A
+#define OV5642_I2C_REGISTER_CHIP_ID_LOW 0x300B
+#define OV5642_I2C_CHIP_ID_HIGH 0x56
+#define OV5642_I2C_CHIP_ID_LOW 0x42
 
 typedef struct OV5642RegisterEntry {
     uint16_t address;
     uint8_t value;
 } OV5642RegisterEntry;
 
-const OV5642RegisterEntry ov5642_RAW[] = {
+/* Below are copied from https://github.com/ArduCAM/Arduino/blob/master/ArduCAM/ov5642_regs.h */
+
+const OV5642RegisterEntry OV5642_RAW[] = {
         {0x3103, 0x03},
         {0x3008, 0x82},
         {0x3017, 0x7f},
@@ -432,7 +436,7 @@ const OV5642RegisterEntry OV5642_640x480_RAW[] = {
         {0xffff, 0xff},
 };
 
-const OV5642RegisterEntry ov5642_320x240[] = {
+const OV5642RegisterEntry OV5642_320x240[] = {
         {0x3800, 0x1},
         {0x3801, 0xa8},
         {0x3802, 0x0},
@@ -462,7 +466,7 @@ const OV5642RegisterEntry ov5642_320x240[] = {
         {0xffff, 0xff},
 };
 
-const OV5642RegisterEntry ov5642_640x480[] = {
+const OV5642RegisterEntry OV5642_640x480[] = {
         {0x3800, 0x1},
         {0x3801, 0xa8},
         {0x3802, 0x0},
@@ -492,7 +496,7 @@ const OV5642RegisterEntry ov5642_640x480[] = {
         {0xffff, 0xff},
 };
 
-const OV5642RegisterEntry ov5642_1280x960[] = {
+const OV5642RegisterEntry OV5642_1280x960[] = {
         {0x3800, 0x1},
         {0x3801, 0xB0},
         {0x3802, 0x0},
@@ -521,7 +525,7 @@ const OV5642RegisterEntry ov5642_1280x960[] = {
         {0xffff, 0xff},
 };
 
-const OV5642RegisterEntry ov5642_1600x1200[] = {
+const OV5642RegisterEntry OV5642_1600x1200[] = {
         {0x3800, 0x1},
         {0x3801, 0xB0},
         {0x3802, 0x0},
@@ -550,7 +554,7 @@ const OV5642RegisterEntry ov5642_1600x1200[] = {
         {0xffff, 0xff},
 };
 
-const OV5642RegisterEntry ov5642_1024x768[] = {
+const OV5642RegisterEntry OV5642_1024x768[] = {
         {0x3800, 0x1},
         {0x3801, 0xB0},
         {0x3802, 0x0},
@@ -580,7 +584,7 @@ const OV5642RegisterEntry ov5642_1024x768[] = {
 };
 
 
-const OV5642RegisterEntry ov5642_2048x1536[] = {
+const OV5642RegisterEntry OV5642_2048x1536[] = {
         {0x3800, 0x01},
         {0x3801, 0xb0},
         {0x3802, 0x00},
@@ -643,7 +647,7 @@ const OV5642RegisterEntry ov5642_2048x1536[] = {
         {0xffff, 0xff},
 };
 
-const OV5642RegisterEntry ov5642_2592x1944[] = {
+const OV5642RegisterEntry OV5642_2592x1944[] = {
         {0x3800, 0x1},
         {0x3801, 0xB0},
         {0x3802, 0x0},
@@ -672,8 +676,7 @@ const OV5642RegisterEntry ov5642_2592x1944[] = {
         {0xffff, 0xff},
 };
 
-const OV5642RegisterEntry ov5642_dvp_zoom8[] = {
-
+const OV5642RegisterEntry OV5642_dvp_zoom8[] = {
         {0x3800, 0x5},
         {0x3801, 0xf8},
         {0x3802, 0x3},

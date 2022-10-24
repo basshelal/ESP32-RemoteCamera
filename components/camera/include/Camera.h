@@ -7,6 +7,8 @@ extern Error camera_init();
 
 extern Error camera_destroy();
 
-extern void camera_read();
+typedef void CameraReadCallback(char *buffer, int bufferSize, void *userArgs);
+
+extern Error camera_readImage(const int chunkSize, CameraReadCallback readCallback, void *userArg);
 
 #endif //ESP32_REMOTECAMERA_CAMERA_H
