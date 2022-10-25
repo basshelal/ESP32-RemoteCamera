@@ -10,6 +10,7 @@
 #include "Camera.h"
 
 #define FILE_BUFFER_SIZE 4096
+#define CAMERA_IMAGE_BUFFER_SIZE 2048
 
 private httpd_handle_t server;
 private void *fileBuffer;
@@ -194,7 +195,7 @@ requestHandler("/api/camera", apiCamera) {
     allowCORS(request);
     httpd_resp_set_type(request, "image/jpeg");
 
-    camera_readImage(1024, cameraReadCallback, request);
+    camera_readImageWithCallback(CAMERA_IMAGE_BUFFER_SIZE, cameraReadCallback, request);
     httpd_resp_send_chunk(request, NULL, 0);
 
     return ESP_OK;

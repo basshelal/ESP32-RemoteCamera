@@ -11,6 +11,7 @@
 
 #define I2C_MASTER_FREQ_HZ 400000
 #define SPI_MASTER_FREQ_HZ SPI_MASTER_FREQ_8M
+#define SPI_MAX_TRANSFER_SIZE SOC_SPI_MAXIMUM_BUFFER_SIZE
 
 /*
  * Arducam is LSB so bits are in the order 76543210, so 1 in bit 1 is 00000010 or 0x02
@@ -213,7 +214,22 @@ private Error camera_getSensorPowerDownIODirection();
 private Error camera_setSensorPowerEnableIODirection();
 private Error camera_getSensorPowerEnableIODirection();
 
-private Error camera_burstFIFORead() {
+private Error camera_burstFIFORead(uint8_t *const byteBuffer, const int bufferLength) {
+    for (int bytesRemaining = bufferLength, bytesRead = 0; bytesRemaining > 0;) {
+        const int bytesToRead = bufferLength > SPI_MAX_TRANSFER_SIZE ? SPI_MAX_TRANSFER_SIZE : bufferLength;
+
+        spi_transaction_t tx = {
+                .cmd = 0x03C | READ,
+                .tx_buffer = NULL,
+                .rxlength = (size_t) bytesToRead * BYTE_TO_BITS,
+                .rx_buffer = byteBuffer + bytesRead,
+        };
+        esp_err_t err = spi_device_polling_transmit(handle, &tx);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(err);
+
+        bytesRemaining -= bytesToRead;
+        bytesRead += bytesToRead;
+    }
 
     return ERROR_NONE;
 }
@@ -265,14 +281,6 @@ private Error camera_getWriteFIFOSize(uint32_t *const fifoLength) {
 
     result3 &= 0x7F; // 0x44 returns a 7 bit number, ignore bit 7
 
-    INFO("Camera FIFO length: %x,%x,%x", result1, result2, result3);
-
-    //  result 1 |  result 2 | result 3
-    // 0000 1000 | 0010 1100 | 0000 0001
-
-    //      76_808
-    // 0000 0001 | 0010 1100 | 0000 1000
-
     *fifoLength = (result3 << 16) | (result2 << 8) | (result1 << 0);
 
     return ERROR_NONE;
@@ -286,6 +294,37 @@ private Error camera_waitForFIFODone() {
     return ERROR_NONE;
 }
 
+public Error camera_setImageSize(const CameraImageSize imageSize) {
+    switch (imageSize) {
+        case CAMERA_IMAGE_SIZE_320x240:
+            i2cWriteRegistryEntries(OV5642_320x240);
+            break;
+        case CAMERA_IMAGE_SIZE_640x480:
+            i2cWriteRegistryEntries(OV5642_640x480);
+            break;
+        case CAMERA_IMAGE_SIZE_1024x768:
+            i2cWriteRegistryEntries(OV5642_1024x768);
+            break;
+        case CAMERA_IMAGE_SIZE_1280x960:
+            i2cWriteRegistryEntries(OV5642_1280x960);
+            break;
+        case CAMERA_IMAGE_SIZE_1600x1200:
+            i2cWriteRegistryEntries(OV5642_1600x1200);
+            break;
+        case CAMERA_IMAGE_SIZE_2048x1536:
+            i2cWriteRegistryEntries(OV5642_2048x1536);
+            break;
+        case CAMERA_IMAGE_SIZE_2592x1944:
+            i2cWriteRegistryEntries(OV5642_2592x1944);
+            break;
+        case CAMERA_IMAGE_SIZE_DEFAULT:
+        default:
+            i2cWriteRegistryEntries(OV5642_1024x768);
+            break;
+    }
+    return ERROR_NONE;
+}
+
 private Error camera_initBuses() {
     spi_bus_config_t spiBusConfig = {
             .miso_io_num = 19,
@@ -293,6 +332,7 @@ private Error camera_initBuses() {
             .sclk_io_num = 18,
             .quadwp_io_num = -1,
             .quadhd_io_num = -1,
+            .max_transfer_sz = SPI_MAX_TRANSFER_SIZE,
             .flags = SPICOMMON_BUSFLAG_MASTER
     };
     esp_err_t err = spi_bus_initialize(VSPI_HOST, &spiBusConfig, SPI_DMA_DISABLED);
@@ -364,37 +404,41 @@ private Error camera_initCameraConfig() {
 
     // system reset
     i2cWriteByte(0x3008, 0x80);
-    delayMillis(100);
+
+    // TODO: 24-Oct-2022 @basshelal: Understand all of these I2C Sensor register values to see what can be tweaked
 
     i2cWriteRegistryEntries(OV5642_QVGA_Preview);
-    delayMillis(100);
-
     i2cWriteRegistryEntries(OV5642_JPEG_Capture_QSXGA);
-    i2cWriteRegistryEntries(OV5642_320x240);
-    delayMillis(100);
+    camera_setImageSize(CAMERA_IMAGE_SIZE_DEFAULT);
 
     i2cWriteByte(0x3818, 0xa8);
-    delayMillis(100);
     i2cWriteByte(0x3621, 0x10);
-    delayMillis(100);
     i2cWriteByte(0x3801, 0xb0);
-    delayMillis(100);
     i2cWriteByte(0x4407, 0x08);
-    delayMillis(100);
     i2cWriteByte(0x5888, 0x00);
-    delayMillis(100);
     i2cWriteByte(0x5000, 0xFF);
-    delayMillis(100);
 
     // Test Color bar image
     i2cWriteByte(0x503d, 0x80);
-    delayMillis(100);
     i2cWriteByte(0x503e, 0x00);
 
     delayMillis(1000); // Let auto exposure do its thing after changing image settings
 
     INFO("Camera setup finished");
 
+    return ERROR_NONE;
+}
+
+public Error camera_captureImage(uint32_t *imageSize) {
+    camera_setVSyncPolarity(false);
+    camera_resetFIFOWrite();
+    camera_resetFIFORead();
+    camera_clearFIFOWriteDoneFlag();
+
+    camera_startCapture();
+    camera_waitForFIFODone();
+
+    camera_getWriteFIFOSize(imageSize);
     return ERROR_NONE;
 }
 
@@ -409,38 +453,26 @@ public Error camera_destroy() {
     return ERROR_NONE;
 }
 
-public Error camera_readImage(const int chunkSize, CameraReadCallback readCallback, void *userArg) {
-    camera_setVSyncPolarity(false);
-    camera_resetFIFOWrite();
-    camera_resetFIFORead();
-    camera_clearFIFOWriteDoneFlag();
-
-    camera_startCapture();
-    INFO("Starting capture");
-    camera_waitForFIFODone();
-    INFO("Capture finished!");
-
-    uint32_t fifoLength;
-    camera_getWriteFIFOSize(&fifoLength);
-    INFO("FIFO Length: %u", fifoLength);
+public Error camera_readImageWithCallback(const int chunkSize, CameraReadCallback readCallback, void *userArg) {
+    uint32_t imageSize;
+    camera_captureImage(&imageSize);
 
     char *buffer = alloc(chunkSize);
 
-    uint8_t byte = 0;
-    for (int i = 0, chunkIndex = 0; i < fifoLength; i++, chunkIndex++) {
-        camera_singleFIFORead(&byte);
-//        printf("%x", byte);
-        if (chunkIndex < chunkSize) {
-            buffer[chunkIndex] = (char) byte;
-        }
-
-        if (chunkIndex + 1 == chunkSize || i + 1 == fifoLength) { // reached end of chunk or end of FIFO
-            readCallback(buffer, chunkIndex + 1, userArg);
-            chunkIndex = -1;
-        }
+    for (int i = (int) imageSize; i >= 0;) {
+        const int bytesToRead = imageSize > chunkSize ? chunkSize : (int) imageSize;
+        camera_burstFIFORead((uint8_t *) buffer, bytesToRead);
+        readCallback(buffer, bytesToRead, userArg);
+        i -= bytesToRead;
     }
 
     free(buffer);
+
+    return ERROR_NONE;
+}
+
+public Error camera_readImage(char *buffer, const size_t bufferLength) {
+    camera_burstFIFORead((uint8_t *) buffer, (int) bufferLength);
 
     return ERROR_NONE;
 }
