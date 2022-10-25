@@ -4,7 +4,6 @@
 #include "Error.h"
 
 typedef enum CameraImageSize {
-    CAMERA_IMAGE_SIZE_DEFAULT,
     CAMERA_IMAGE_SIZE_320x240,
     CAMERA_IMAGE_SIZE_640x480,
     CAMERA_IMAGE_SIZE_1024x768,
@@ -12,11 +11,15 @@ typedef enum CameraImageSize {
     CAMERA_IMAGE_SIZE_1600x1200,
     CAMERA_IMAGE_SIZE_2048x1536,
     CAMERA_IMAGE_SIZE_2592x1944,
+    CAMERA_IMAGE_SIZE_DEFAULT = CAMERA_IMAGE_SIZE_1024x768
 } CameraImageSize;
 
 typedef void CameraReadCallback(char *buffer, int bufferSize, void *userArgs);
 
 extern Error camera_init();
+
+/** Initializes the camera to its default values ready to use, can be called multiple times to restart camera */
+extern Error camera_start();
 
 extern Error camera_destroy();
 
@@ -24,8 +27,8 @@ extern Error camera_captureImage(uint32_t *imageSize);
 
 extern Error camera_setImageSize(const CameraImageSize imageSize);
 
-extern Error camera_readImage(char *buffer, const size_t bufferLength);
-
-extern Error camera_readImageWithCallback(const int chunkSize, CameraReadCallback readCallback, void *userArg);
+extern Error camera_readImageBufferedWithCallback(char *buffer, const int bufferLength,
+                                                  const uint32_t imageSize,
+                                                  CameraReadCallback readCallback, void *userArg);
 
 #endif //ESP32_REMOTECAMERA_CAMERA_H

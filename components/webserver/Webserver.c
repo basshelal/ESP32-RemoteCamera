@@ -15,10 +15,12 @@
 private httpd_handle_t server;
 private void *fileBuffer;
 private void *favIconFileBuffer;
+private char *imageBuffer;
 private LogList *logList;
 
 #define requestHandler(endpoint, name) private esp_err_t requestHandler_ ## name(httpd_req_t *request)
 #define allowCORS(request) httpd_resp_set_hdr(request, "Access-Control-Allow-Origin", "*")
+#define finishRequest(request) httpd_resp_send_chunk(request, NULL, 0)
 
 private bool socketsListIntEquals(const ListItem *a, const ListItem *b) {
     if (a == NULL && b == NULL) return true;
@@ -72,7 +74,7 @@ requestHandler("/pages*", pages) {
             bytesRemaining -= bytesRead;
             readPosition += bytesRead;
         }
-        espErr = httpd_resp_send_chunk(request, NULL, 0);
+        espErr = finishRequest(request);
         if (espErr != ESP_OK) {
             ERROR("httpd_resp_send_chunk() returned %i : %s", espErr, esp_err_to_name(espErr));
         }
@@ -111,7 +113,7 @@ requestHandler("/pages/favicon", favIcon) {
             bytesRemaining -= bytesRead;
             readPosition += bytesRead;
         }
-        espErr = httpd_resp_send_chunk(request, NULL, 0);
+        espErr = finishRequest(request);
         if (espErr != ESP_OK) {
             ERROR("httpd_resp_send_chunk() returned %i : %s", espErr, esp_err_to_name(espErr));
         }
@@ -193,10 +195,18 @@ private void cameraReadCallback(char *buffer, int bufferSize, void *userArgs) {
 
 requestHandler("/api/camera", apiCamera) {
     allowCORS(request);
-    httpd_resp_set_type(request, "image/jpeg");
 
-    camera_readImageWithCallback(CAMERA_IMAGE_BUFFER_SIZE, cameraReadCallback, request);
-    httpd_resp_send_chunk(request, NULL, 0);
+    uint32_t imageSize;
+    Error err = camera_captureImage(&imageSize);
+    if (err == ERROR_NONE) {
+        httpd_resp_set_type(request, "image/jpeg");
+        camera_readImageBufferedWithCallback(imageBuffer, CAMERA_IMAGE_BUFFER_SIZE, imageSize,
+                                             cameraReadCallback, request);
+        finishRequest(request);
+    } else {
+        httpd_resp_send_err(request, HTTPD_500_INTERNAL_SERVER_ERROR,
+                            "Unknown error occurred capturing image");
+    }
 
     return ESP_OK;
 }
@@ -327,6 +337,7 @@ public Error webserver_init() {
 
     fileBuffer = alloc(FILE_BUFFER_SIZE);
     favIconFileBuffer = alloc(FILE_BUFFER_SIZE);
+    imageBuffer = alloc(CAMERA_IMAGE_BUFFER_SIZE);
     logList = log_getLogList();
     logList_addOnAppendCallback(logList, onAppendCallback);
     asyncData = new(WebsocketAsyncData);

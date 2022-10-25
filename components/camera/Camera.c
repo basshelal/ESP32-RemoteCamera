@@ -5,8 +5,8 @@
 #include <driver/spi_master.h>
 #include "driver/i2c.h"
 
-#define WRITE 0x80
-#define READ  0x00
+#define SPI_WRITE 0x80
+#define SPI_READ  0x00
 #define BYTE_TO_BITS 8
 
 #define I2C_MASTER_FREQ_HZ 400000
@@ -17,7 +17,9 @@
  * Arducam is LSB so bits are in the order 76543210, so 1 in bit 1 is 00000010 or 0x02
  */
 
-private spi_device_handle_t handle;
+private struct {
+    spi_device_handle_t spiDeviceHandle;
+} this;
 
 private esp_err_t spiSend(const uint16_t command,
                           const uint8_t *const sendData, const size_t sendDataLength,
@@ -32,7 +34,7 @@ private esp_err_t spiSend(const uint16_t command,
         tx.length = sendDataLength * BYTE_TO_BITS;
     }
 
-    esp_err_t err = spi_device_polling_transmit(handle, &tx);
+    esp_err_t err = spi_device_polling_transmit(this.spiDeviceHandle, &tx);
     return err;
 }
 
@@ -97,13 +99,13 @@ i2cWrite(registerAddress, &value, sizeof(value));\
 } while(0)
 
 private Error camera_setTestRegister(const uint8_t value) {
-    esp_err_t err = spiSendOnly(0x00 | WRITE, &value, sizeof(value));
+    esp_err_t err = spiSendOnly(0x00 | SPI_WRITE, &value, sizeof(value));
     ESP_ERROR_CHECK(err);
     return ERROR_NONE;
 }
 
 private Error camera_getTestRegister(uint8_t *const value) {
-    esp_err_t err = spiReceiveOnly(0x00 | READ, value, sizeof(uint8_t));
+    esp_err_t err = spiReceiveOnly(0x00 | SPI_READ, value, sizeof(uint8_t));
     ESP_ERROR_CHECK(err);
     return ERROR_NONE;
 }
@@ -112,43 +114,16 @@ private Error camera_setFramesToCapture(uint8_t framesCount) {
     framesCount--;
     if (framesCount > 7) framesCount = 7;
 
-    esp_err_t err = spiSendOnly(0x01 | WRITE, &framesCount, sizeof(framesCount));
+    esp_err_t err = spiSendOnly(0x01 | SPI_WRITE, &framesCount, sizeof(framesCount));
     ESP_ERROR_CHECK(err);
     return ERROR_NONE;
 }
 
 private Error camera_getFramesToCapture(uint8_t *const framesCount) {
     uint8_t receivedData = 0;
-    esp_err_t err = spiReceiveOnly(0x01 | READ, &receivedData, sizeof(receivedData));
+    esp_err_t err = spiReceiveOnly(0x01 | SPI_READ, &receivedData, sizeof(receivedData));
     ESP_ERROR_CHECK(err);
     *framesCount = ++receivedData;
-    return ERROR_NONE;
-}
-
-typedef enum {
-    UNKNOWN = 0x0, MCU = 0x01, CAMERA = 0x02,
-} DataBusOwner;
-
-private Error camera_setDataBusOwner(const DataBusOwner owner) {
-    const uint8_t data = (uint8_t) owner;
-    esp_err_t err = spiSendOnly(0x02 | WRITE, &data, sizeof(data));
-    ESP_ERROR_CHECK(err);
-    return ERROR_NONE;
-}
-
-private Error camera_getDataBusOwner(DataBusOwner *const owner) {
-    uint8_t receivedData = 0;
-    esp_err_t err = spiReceiveOnly(0x02 | READ, &receivedData, sizeof(receivedData));
-    ESP_ERROR_CHECK(err);
-
-    if ((receivedData & CAMERA) == CAMERA) {
-        *owner = CAMERA;
-    } else if ((receivedData & MCU) == MCU) {
-        *owner = MCU;
-    } else {
-        *owner = UNKNOWN;
-    }
-
     return ERROR_NONE;
 }
 
@@ -157,14 +132,14 @@ private Error camera_getHSyncPolarity();
 
 private Error camera_setVSyncPolarity(const bool isVsyncOn) {
     const uint8_t data = ((uint8_t) (!isVsyncOn)) << 1;
-    esp_err_t err = spiSendOnly(0x03 | WRITE, &data, sizeof(data));
+    esp_err_t err = spiSendOnly(0x03 | SPI_WRITE, &data, sizeof(data));
     ESP_ERROR_CHECK(err);
     return ERROR_NONE;
 }
 
 private Error camera_getVSyncPolarity(bool *const isVsyncOn) {
     uint8_t receivedData = 0;
-    esp_err_t err = spiReceiveOnly(0x03 | READ, &receivedData, sizeof(receivedData));
+    esp_err_t err = spiReceiveOnly(0x03 | SPI_READ, &receivedData, sizeof(receivedData));
     ESP_ERROR_CHECK(err);
 
     const uint8_t vsyncResult = receivedData & 0x02; // vsync is bit 1
@@ -172,59 +147,47 @@ private Error camera_getVSyncPolarity(bool *const isVsyncOn) {
     return ERROR_NONE;
 }
 
-private Error camera_setLCDBacklight();
-private Error camera_getLCDBacklight();
-
-private Error camera_setSensorPClock();
-private Error camera_getSensorPClock();
-
 private Error camera_clearFIFOWriteDoneFlag() {
     uint8_t data = 0x01;
-    esp_err_t err = spiSendOnly(0x04 | WRITE, &data, sizeof(data));
+    esp_err_t err = spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
     ESP_ERROR_CHECK(err);
     return ERROR_NONE;
 }
 
 private Error camera_startCapture() {
     uint8_t data = 0x02;
-    esp_err_t err = spiSendOnly(0x04 | WRITE, &data, sizeof(data));
+    esp_err_t err = spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
     ESP_ERROR_CHECK(err);
     return ERROR_NONE;
 }
 
 private Error camera_resetFIFOWrite() {
     uint8_t data = 0x10;
-    esp_err_t err = spiSendOnly(0x04 | WRITE, &data, sizeof(data));
+    esp_err_t err = spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
     ESP_ERROR_CHECK(err);
     return ERROR_NONE;
 }
 
 private Error camera_resetFIFORead() {
     uint8_t data = 0x20;
-    esp_err_t err = spiSendOnly(0x04 | WRITE, &data, sizeof(data));
+    esp_err_t err = spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
     ESP_ERROR_CHECK(err);
     return ERROR_NONE;
 }
 
-private Error camera_resetSensorIODirection();
-
-private Error camera_setSensorPowerDownIODirection();
-private Error camera_getSensorPowerDownIODirection();
-
-private Error camera_setSensorPowerEnableIODirection();
-private Error camera_getSensorPowerEnableIODirection();
+// TODO: 25-Oct-2022 @basshelal: Sensor standby and sensor low power
 
 private Error camera_burstFIFORead(uint8_t *const byteBuffer, const int bufferLength) {
     for (int bytesRemaining = bufferLength, bytesRead = 0; bytesRemaining > 0;) {
         const int bytesToRead = bufferLength > SPI_MAX_TRANSFER_SIZE ? SPI_MAX_TRANSFER_SIZE : bufferLength;
 
         spi_transaction_t tx = {
-                .cmd = 0x03C | READ,
+                .cmd = 0x03C | SPI_READ,
                 .tx_buffer = NULL,
                 .rxlength = (size_t) bytesToRead * BYTE_TO_BITS,
                 .rx_buffer = byteBuffer + bytesRead,
         };
-        esp_err_t err = spi_device_polling_transmit(handle, &tx);
+        esp_err_t err = spi_device_polling_transmit(this.spiDeviceHandle, &tx);
         ESP_ERROR_CHECK_WITHOUT_ABORT(err);
 
         bytesRemaining -= bytesToRead;
@@ -236,7 +199,7 @@ private Error camera_burstFIFORead(uint8_t *const byteBuffer, const int bufferLe
 
 private Error camera_singleFIFORead(uint8_t *const byteReceived) {
     uint8_t receivedData = 0;
-    esp_err_t err = spiReceiveOnly(0x03D | READ, &receivedData, sizeof(receivedData));
+    esp_err_t err = spiReceiveOnly(0x03D | SPI_READ, &receivedData, sizeof(receivedData));
     ESP_ERROR_CHECK(err);
 
     *byteReceived = receivedData;
@@ -245,7 +208,7 @@ private Error camera_singleFIFORead(uint8_t *const byteReceived) {
 
 private Error camera_getVersion(uint8_t *const major, uint8_t *const minor) {
     uint8_t receivedData = 0;
-    esp_err_t err = spiReceiveOnly(0x40 | READ, &receivedData, sizeof(receivedData));
+    esp_err_t err = spiReceiveOnly(0x40 | SPI_READ, &receivedData, sizeof(receivedData));
     ESP_ERROR_CHECK(err);
 
     *major = receivedData >> 4;
@@ -258,7 +221,7 @@ private Error camera_getVSyncPinStatus();
 
 private Error camera_getFIFOWriteDoneFlag(bool *const isFIFODone) {
     uint8_t receivedData = 0;
-    esp_err_t err = spiReceiveOnly(0x41 | READ, &receivedData, sizeof(receivedData));
+    esp_err_t err = spiReceiveOnly(0x41 | SPI_READ, &receivedData, sizeof(receivedData));
     ESP_ERROR_CHECK(err);
     *isFIFODone = (receivedData & 0x08) == 0x08;
     return ERROR_NONE;
@@ -268,15 +231,15 @@ private Error camera_getWriteFIFOSize(uint32_t *const fifoLength) {
     esp_err_t err;
 
     uint8_t result1 = 0;
-    err = spiReceiveOnly(0x42 | READ, &result1, sizeof(result1));
+    err = spiReceiveOnly(0x42 | SPI_READ, &result1, sizeof(result1));
     ESP_ERROR_CHECK(err);
 
     uint8_t result2 = 0;
-    err = spiReceiveOnly(0x43 | READ, &result2, sizeof(result2));
+    err = spiReceiveOnly(0x43 | SPI_READ, &result2, sizeof(result2));
     ESP_ERROR_CHECK(err);
 
     uint8_t result3 = 0;
-    err = spiReceiveOnly(0x44 | READ, &result3, sizeof(result3));
+    err = spiReceiveOnly(0x44 | SPI_READ, &result3, sizeof(result3));
     ESP_ERROR_CHECK(err);
 
     result3 &= 0x7F; // 0x44 returns a 7 bit number, ignore bit 7
@@ -317,10 +280,6 @@ public Error camera_setImageSize(const CameraImageSize imageSize) {
         case CAMERA_IMAGE_SIZE_2592x1944:
             i2cWriteRegistryEntries(OV5642_2592x1944);
             break;
-        case CAMERA_IMAGE_SIZE_DEFAULT:
-        default:
-            i2cWriteRegistryEntries(OV5642_1024x768);
-            break;
     }
     return ERROR_NONE;
 }
@@ -347,7 +306,7 @@ private Error camera_initBuses() {
             .queue_size = 1,
             .flags = SPI_DEVICE_HALFDUPLEX
     };
-    err = spi_bus_add_device(VSPI_HOST, &spiDeviceConfig, &handle);
+    err = spi_bus_add_device(VSPI_HOST, &spiDeviceConfig, &this.spiDeviceHandle);
     ESP_ERROR_CHECK(err);
 
     i2c_config_t i2cConfig = {
@@ -371,60 +330,79 @@ private Error camera_initBuses() {
     return ERROR_NONE;
 }
 
-private Error camera_initCameraConfig() {
-    camera_setFramesToCapture(1);
-    uint8_t frames;
-    camera_getFramesToCapture(&frames);
-    INFO("Frames to capture: %u", frames);
-
+private Error camera_testArduchipSPI() {
     const uint8_t testValue = 0x69;
     camera_setTestRegister(testValue);
 
     uint8_t returnValue;
     camera_getTestRegister(&returnValue);
     if (returnValue != testValue) {
-        ERROR("Test SPI register did not return expected result, expected: %u, was %u", testValue, returnValue);
+        throw(ERROR_ILLEGAL_STATE,
+              "Test SPI register did not return expected result, expected: 0x%x, was 0x%x",
+              testValue, returnValue);
     }
+    return ERROR_NONE;
+}
 
-    camera_setDataBusOwner(0x0);
-
-    i2cWriteByte(0x00FF, 0x01);
-
+private Error camera_testOV5642SensorI2C() {
     uint8_t versionHigh;
     i2cRead(OV5642_I2C_REGISTER_CHIP_ID_HIGH, &versionHigh, sizeof(versionHigh));
 
     uint8_t versionLow;
     i2cRead(OV5642_I2C_REGISTER_CHIP_ID_LOW, &versionLow, sizeof(versionLow));
 
-    INFO("Chip ID: %x%x", versionHigh, versionLow);
     if (versionHigh != OV5642_I2C_CHIP_ID_HIGH || versionLow != OV5642_I2C_CHIP_ID_LOW) {
-        ERROR("Version I2C register did not return expected result, expected: (%u, %u), was (%u, %u)",
-              OV5642_I2C_CHIP_ID_HIGH, OV5642_I2C_CHIP_ID_LOW, versionHigh, versionLow);
+        throw(ERROR_ILLEGAL_STATE,
+              "Version I2C register did not return expected result, expected: (0x%x, 0x%x), was (0x%x, 0x%x)",
+              OV5642_I2C_CHIP_ID_HIGH, OV5642_I2C_CHIP_ID_LOW,
+              versionHigh, versionLow);
     }
 
-    // system reset
-    i2cWriteByte(0x3008, 0x80);
+    return ERROR_NONE;
+}
 
-    // TODO: 24-Oct-2022 @basshelal: Understand all of these I2C Sensor register values to see what can be tweaked
+private void camera_showOV5642TestColorBar() {
+    // Test Color bar image
+    i2cWriteByte(0x503d, 0x80);
+    i2cWriteByte(0x503e, 0x00);
+}
+
+enum CompressionAmount {
+    COMPRESSION_DEFAULT, COMPRESSION_HIGH, COMPRESSION_LOW,
+};
+
+private void camera_setCompressionAmount(const enum CompressionAmount compressionAmount) {
+    switch (compressionAmount) {
+        case COMPRESSION_DEFAULT:
+            i2cWriteByte(0x4407, 0x04); // average, default
+            break;
+        case COMPRESSION_HIGH:
+            i2cWriteByte(0x4407, 0x08); // high compression, low quality image
+            break;
+        case COMPRESSION_LOW:
+            i2cWriteByte(0x4407, 0x02); // low compression, high quality image
+            break;
+    }
+}
+
+public Error camera_start() {
+    i2cWriteByte(0x3008, 0x80); // Full sensor reset
 
     i2cWriteRegistryEntries(OV5642_QVGA_Preview);
     i2cWriteRegistryEntries(OV5642_JPEG_Capture_QSXGA);
     camera_setImageSize(CAMERA_IMAGE_SIZE_DEFAULT);
 
-    i2cWriteByte(0x3818, 0xa8);
-    i2cWriteByte(0x3621, 0x10);
-    i2cWriteByte(0x3801, 0xb0);
-    i2cWriteByte(0x4407, 0x08);
-    i2cWriteByte(0x5888, 0x00);
-    i2cWriteByte(0x5000, 0xFF);
+    i2cWriteByte(0x3818, 0xa8); // enable compression, vertical flip on
+    i2cWriteByte(0x3621, 0x10); // enable mirror function
+    i2cWriteByte(0x3801, 0xb0); // ? something to do with enable mirror function as well
+    i2cWriteByte(0x4407, 0x08); // QS Quantization scale, ie compression quality
+    i2cWriteByte(0x5888, 0x00); // ? something to do with lens correction
+    i2cWriteByte(0x5000, 0xFF); // General functions all enabled
+    camera_setCompressionAmount(COMPRESSION_DEFAULT);
 
-    // Test Color bar image
-    i2cWriteByte(0x503d, 0x80);
-    i2cWriteByte(0x503e, 0x00);
-
-    delayMillis(1000); // Let auto exposure do its thing after changing image settings
-
-    INFO("Camera setup finished");
+    camera_setFramesToCapture(1);
+    camera_resetFIFOWrite();
+    camera_resetFIFORead();
 
     return ERROR_NONE;
 }
@@ -444,7 +422,7 @@ public Error camera_captureImage(uint32_t *imageSize) {
 
 public Error camera_init() {
     throwIfError(camera_initBuses(), "");
-    throwIfError(camera_initCameraConfig(), "");
+    throwIfError(camera_start(), "");
 
     return ERROR_NONE;
 }
@@ -453,26 +431,15 @@ public Error camera_destroy() {
     return ERROR_NONE;
 }
 
-public Error camera_readImageWithCallback(const int chunkSize, CameraReadCallback readCallback, void *userArg) {
-    uint32_t imageSize;
-    camera_captureImage(&imageSize);
-
-    char *buffer = alloc(chunkSize);
-
+public Error camera_readImageBufferedWithCallback(char *buffer, const int bufferLength,
+                                                  const uint32_t imageSize,
+                                                  CameraReadCallback readCallback, void *userArg) {
     for (int i = (int) imageSize; i >= 0;) {
-        const int bytesToRead = imageSize > chunkSize ? chunkSize : (int) imageSize;
+        const int bytesToRead = imageSize > bufferLength ? bufferLength : (int) imageSize;
         camera_burstFIFORead((uint8_t *) buffer, bytesToRead);
         readCallback(buffer, bytesToRead, userArg);
         i -= bytesToRead;
     }
-
-    free(buffer);
-
-    return ERROR_NONE;
-}
-
-public Error camera_readImage(char *buffer, const size_t bufferLength) {
-    camera_burstFIFORead((uint8_t *) buffer, (int) bufferLength);
 
     return ERROR_NONE;
 }
