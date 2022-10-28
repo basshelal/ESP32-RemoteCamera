@@ -10,18 +10,31 @@
 #include "Camera.h"
 
 #define FILE_BUFFER_SIZE 4096
-#define CAMERA_IMAGE_BUFFER_SIZE 2048
+#define CAMERA_IMAGE_BUFFER_SIZE 4096
 
-private httpd_handle_t server;
-private void *fileBuffer;
-private void *favIconFileBuffer;
-private char *imageBuffer;
-private char *imagePOSTBuffer;
-private LogList *logList;
+private struct {
+    bool isInitialized;
+    httpd_handle_t server;
+    void *pageBuffer;
+    void *favIconBuffer;
+    char *imageBuffer;
+    char *imagePOSTBuffer;
+    LogList *logList;
+    struct {
+        List *socketsList; // list of sockets, a socket is an int
+        List *deadSocketsIndices; // index of a socket in socketsList that is no longer available
+        const char *logString; // string to send through log websocket
+    } logWebsocketData;
+} this;
 
-#define requestHandler(endpoint, name) private esp_err_t requestHandler_ ## name(httpd_req_t *request)
+#define requestHandler(name, uri) private esp_err_t requestHandler_ ## name(httpd_req_t *request)
 #define allowCORS(request) httpd_resp_set_hdr(request, "Access-Control-Allow-Origin", "*")
 #define finishRequest(request) httpd_resp_send_chunk(request, NULL, 0)
+#define addEndpoint(_uri, _method, _handler) \
+do{                                       \
+httpd_uri_t uriHandler = {.uri= _uri, .method= _method, .handler= requestHandler_ ## _handler};\
+httpd_register_uri_handler(this.server, &uriHandler);\
+} while(0)
 
 private bool socketsListIntEquals(const ListItem *a, const ListItem *b) {
     if (a == NULL && b == NULL) return true;
@@ -34,20 +47,14 @@ private bool socketsListIntEquals(const ListItem *a, const ListItem *b) {
     }
 }
 
-typedef struct {
-    List *socketsList;
-    const char *string;
-} WebsocketAsyncData;
-private WebsocketAsyncData *asyncData;
-
-requestHandler(NULL, 404) {
+requestHandler(404, NULL) {
     allowCORS(request);
     INFO("URI: %s", request->uri);
     httpd_resp_send_404(request);
     return ESP_OK;
 }
 
-requestHandler("/pages*", pages) {
+requestHandler(pages, "/pages*") {
     allowCORS(request);
     INFO("URI: %s", request->uri);
     httpd_resp_set_status(request, HTTPD_200);
@@ -67,8 +74,8 @@ requestHandler("/pages*", pages) {
             uint bytesRead;
             const uint bytesToRead = (bytesRemaining < FILE_BUFFER_SIZE) ? bytesRemaining : FILE_BUFFER_SIZE;
             internalStorage_readFile(file, readPosition,
-                                     fileBuffer, bytesToRead, &bytesRead);
-            espErr = httpd_resp_send_chunk(request, fileBuffer, (ssize_t) bytesRead);
+                                     this.pageBuffer, bytesToRead, &bytesRead);
+            espErr = httpd_resp_send_chunk(request, this.pageBuffer, (ssize_t) bytesRead);
             if (espErr != ESP_OK) {
                 ERROR("httpd_resp_send_chunk() returned %i : %s", espErr, esp_err_to_name(espErr));
             }
@@ -86,7 +93,7 @@ requestHandler("/pages*", pages) {
     return ESP_OK;
 }
 
-requestHandler("/pages/favicon", favIcon) {
+requestHandler(favIcon, "/pages/favicon") {
     allowCORS(request);
     INFO("URI: %s", request->uri);
     httpd_resp_set_status(request, HTTPD_200);
@@ -105,9 +112,9 @@ requestHandler("/pages/favicon", favIcon) {
         while (bytesRemaining > 0) {
             uint bytesRead;
             const uint bytesToRead = (bytesRemaining < FILE_BUFFER_SIZE) ? bytesRemaining : FILE_BUFFER_SIZE;
-            internalStorage_readFile(file, readPosition, favIconFileBuffer,
+            internalStorage_readFile(file, readPosition, this.favIconBuffer,
                                      bytesToRead, &bytesRead);
-            espErr = httpd_resp_send_chunk(request, favIconFileBuffer, (ssize_t) bytesRead);
+            espErr = httpd_resp_send_chunk(request, this.favIconBuffer, (ssize_t) bytesRead);
             if (espErr != ESP_OK) {
                 ERROR("httpd_resp_send_chunk() returned %i : %s", espErr, esp_err_to_name(espErr));
             }
@@ -125,14 +132,14 @@ requestHandler("/pages/favicon", favIcon) {
     return ESP_OK;
 }
 
-requestHandler("/api/log", apiLog) {
+requestHandler(apiLog, "/api/log") {
     allowCORS(request);
     INFO("URI: %s", request->uri);
-    capacity_t capacity = logList_getSize(logList);
+    capacity_t capacity = logList_getSize(this.logList);
     ListOptions listOptions = LIST_DEFAULT_OPTIONS;
     listOptions.capacity = capacity;
     List *list = list_createWithOptions(&listOptions);
-    logList_getList(logList, list);
+    logList_getList(this.logList, list);
     const capacity_t listSize = list_getSize(list);
 
     cJSON *jsonObject = cJSON_CreateObject();
@@ -174,7 +181,7 @@ requestHandler("/api/log", apiLog) {
     return ESP_OK;
 }
 
-requestHandler("/api/battery", apiBattery) {
+requestHandler(apiBattery, "/api/battery") {
     allowCORS(request);
     /*{ isCharging:boolean, voltage:number, percentage:number }*/
     BatteryInfo batteryInfo = {};
@@ -194,12 +201,12 @@ private void cameraReadCallback(char *buffer, int bufferSize, void *userArgs) {
     httpd_resp_send_chunk(request, buffer, bufferSize);
 }
 
-requestHandler("/api/cameraSettings", cameraSettings) {
+requestHandler(cameraSettings, "/api/cameraSettings") {
     allowCORS(request);
 
-    httpd_req_recv(request, imagePOSTBuffer, CAMERA_IMAGE_BUFFER_SIZE);
+    httpd_req_recv(request, this.imagePOSTBuffer, CAMERA_IMAGE_BUFFER_SIZE);
 
-    INFO("%s", imagePOSTBuffer);
+    INFO("%s", this.imagePOSTBuffer);
 
     httpd_resp_set_status(request, HTTPD_200);
     finishRequest(request);
@@ -207,14 +214,14 @@ requestHandler("/api/cameraSettings", cameraSettings) {
     return ESP_OK;
 }
 
-requestHandler("/api/camera", apiCamera) {
+requestHandler(apiCamera, "/api/camera") {
     allowCORS(request);
 
     uint32_t imageSize;
     Error err = camera_captureImage(&imageSize);
     if (err == ERROR_NONE) {
         httpd_resp_set_type(request, "image/jpeg");
-        camera_readImageBufferedWithCallback(imageBuffer, CAMERA_IMAGE_BUFFER_SIZE, imageSize,
+        camera_readImageBufferedWithCallback(this.imageBuffer, CAMERA_IMAGE_BUFFER_SIZE, imageSize,
                                              cameraReadCallback, request);
         finishRequest(request);
     } else {
@@ -225,7 +232,7 @@ requestHandler("/api/camera", apiCamera) {
     return ESP_OK;
 }
 
-requestHandler("/socket/log", socketLog) {
+requestHandler(wsLog, "/ws/log") {
     allowCORS(request);
     INFO("URI: %s", request->uri);
     INFO("Method: %s", http_method_str(request->method));
@@ -233,13 +240,14 @@ requestHandler("/socket/log", socketLog) {
     if (socketNumber == -1) return ESP_OK;
     int *socketNumberPtr = new(int);
     *socketNumberPtr = socketNumber;
-    index_t foundIndex = list_indexOfItemFunction(asyncData->socketsList, socketNumberPtr, socketsListIntEquals);
+    index_t foundIndex = list_indexOfItemFunction(this.logWebsocketData.socketsList, socketNumberPtr,
+                                                  socketsListIntEquals);
     if (foundIndex == LIST_INVALID_INDEX_CAPACITY) {
-        list_addItem(asyncData->socketsList, socketNumberPtr);
+        INFO("New socket fd: %i", socketNumber);
+        list_addItem(this.logWebsocketData.socketsList, socketNumberPtr);
     } else {
         free(socketNumberPtr);
     }
-    INFO("Socket fd: %i", socketNumber);
     if (request->method == HTTP_GET) {
         httpd_resp_set_status(request, HTTPD_200);
         return ESP_OK;
@@ -247,7 +255,7 @@ requestHandler("/socket/log", socketLog) {
     return ESP_OK;
 }
 
-requestHandler("/files/*", files) {
+requestHandler(files, "/files/*") {
     allowCORS(request);
     INFO("URI: %s", request->uri);
 
@@ -266,46 +274,55 @@ requestHandler("/files/*", files) {
     return ESP_OK;
 }
 
+private void clearDeadSocketsList() {
+    for (int i = 0; i < list_getSize(this.logWebsocketData.deadSocketsIndices); i++) {
+        int *indexPtr = list_getItem(this.logWebsocketData.deadSocketsIndices, i);
+        int *socketNumber = list_getItem(this.logWebsocketData.socketsList, *indexPtr);
+        list_removeItemIndexed(this.logWebsocketData.socketsList, *indexPtr);
+        INFO("Removed socket fd: %i", *socketNumber);
+        free(indexPtr);
+        free(socketNumber);
+    }
+    list_clear(this.logWebsocketData.deadSocketsIndices);
+}
+
 private void sendLogToWebSocketClients(void *arg) {
-    WebsocketAsyncData *asyncDataLocal = (WebsocketAsyncData *) arg;
-    if (!asyncDataLocal || !asyncDataLocal->socketsList) return;
+    typeof(this.logWebsocketData) *websocketDataPtr = ((typeof(this.logWebsocketData) *) arg);
+    if (!websocketDataPtr) return;
+    typeof(this.logWebsocketData) websocketData = *websocketDataPtr;
     ListOptions options = LIST_DEFAULT_OPTIONS;
-    options.capacity = list_getSize(asyncDataLocal->socketsList);
-    List *indicesToRemove = list_create();
-    for (int i = 0; i < list_getSize(asyncDataLocal->socketsList); i++) {
-        int *socketPtr = list_getItem(asyncDataLocal->socketsList, i);
+    options.capacity = list_getSize(websocketData.socketsList);
+    for (int i = 0; i < list_getSize(websocketData.socketsList); i++) {
+        int *socketPtr = list_getItem(websocketData.socketsList, i);
         if (!socketPtr) continue;
-        httpd_ws_frame_t websocketFrame = {};
-        websocketFrame.type = HTTPD_WS_TYPE_TEXT;
-        websocketFrame.payload = asyncDataLocal->string;
-        websocketFrame.len = strlen(asyncDataLocal->string);
-        esp_err_t err = httpd_ws_send_frame_async(server, *socketPtr, &websocketFrame);
+        httpd_ws_frame_t websocketFrame = {
+                .type = HTTPD_WS_TYPE_TEXT,
+                .payload = websocketData.logString,
+                .len = strlen(websocketData.logString),
+        };
+        esp_err_t err = httpd_ws_send_frame_async(this.server, *socketPtr, &websocketFrame);
         if (err) {
             if (err == ESP_ERR_INVALID_ARG) {
                 int *indexPtr = new(int);
                 *indexPtr = i;
-                list_addItem(indicesToRemove, indexPtr);
+                list_addItem(websocketData.deadSocketsIndices, indexPtr);
             }
         }
     }
-    for (int i = 0; i < list_getSize(indicesToRemove); i++) {
-        int *indexPtr = list_getItem(indicesToRemove, i);
-        int *socketNumber = list_getItem(asyncDataLocal->socketsList, *indexPtr);
-        list_removeItemIndexed(asyncDataLocal->socketsList, *indexPtr);
-        free(indexPtr);
-        free(socketNumber);
-    }
-    list_destroy(indicesToRemove);
+    clearDeadSocketsList();
 }
 
-private void onAppendCallback(const LogList *_logList, const char *string) {
-    asyncData->string = string;
-    httpd_queue_work(server, sendLogToWebSocketClients, asyncData);
+private void logListOnAppendCallback(const LogList *_logList, const char *string) {
+    this.logWebsocketData.logString = string;
+    httpd_queue_work(this.server, sendLogToWebSocketClients, &this.logWebsocketData);
 }
 
 public Error webserver_init() {
+    if (this.isInitialized) {
+        WARN("WebServer has already been initialized");
+        return ERROR_NONE;
+    }
     esp_err_t err;
-    server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
     config.max_uri_handlers = 128;
@@ -313,53 +330,42 @@ public Error webserver_init() {
 
     INFO("Starting Web Server on port: '%d'", config.server_port);
 
-    if ((err = httpd_start(&server, &config))) {
+    if ((err = httpd_start(&this.server, &config))) {
         throwESPError(httpd_start(), err);
     }
 
-    httpd_uri_t favIconHandler = {.uri= "/pages/favicon.*", .method= HTTP_GET, .handler= requestHandler_favIcon};
-    httpd_register_uri_handler(server, &favIconHandler);
-
-    httpd_uri_t webPageHandler = {.uri= "/pages*", .method= HTTP_GET, .handler= requestHandler_pages};
-    httpd_register_uri_handler(server, &webPageHandler);
-
-    httpd_uri_t logApiHandler = {.uri= "/api/log", .method= HTTP_GET, .handler= requestHandler_apiLog};
-    httpd_register_uri_handler(server, &logApiHandler);
-
-    httpd_uri_t batteryApiHandler = {.uri= "/api/battery", .method= HTTP_GET, .handler= requestHandler_apiBattery};
-    httpd_register_uri_handler(server, &batteryApiHandler);
-
-    httpd_uri_t cameraApiHandler = {.uri= "/api/camera", .method= HTTP_GET, .handler= requestHandler_apiCamera};
-    httpd_register_uri_handler(server, &cameraApiHandler);
-
-    httpd_uri_t cameraApiPostHandler = {.uri= "/api/cameraSettings", .method= HTTP_POST, .handler= requestHandler_cameraSettings};
-    httpd_register_uri_handler(server, &cameraApiPostHandler);
-
-    httpd_uri_t logSocketHandler = {.uri= "/socket/log", .method= HTTP_GET, .handler= requestHandler_socketLog,
-            .is_websocket= true};
-    httpd_register_uri_handler(server, &logSocketHandler);
-
-    httpd_uri_t filesApiHandler = {.uri= "/files/*", .method= HTTP_GET, .handler= requestHandler_files};
-    httpd_register_uri_handler(server, &filesApiHandler);
-
-    httpd_uri_t rootHandler = {.uri= "/", .method= HTTP_GET, .handler= requestHandler_pages};
-    httpd_register_uri_handler(server, &rootHandler);
-
-    INFO("Web Server started!");
+    addEndpoint("/pages/favicon.*", HTTP_GET, favIcon);
+    addEndpoint("/pages*", HTTP_GET, pages);
+    addEndpoint("/api/log", HTTP_GET, apiLog);
+    addEndpoint("/api/battery", HTTP_GET, apiBattery);
+    addEndpoint("/api/camera", HTTP_GET, apiCamera);
+    addEndpoint("/api/cameraSettings", HTTP_POST, cameraSettings);
+    addEndpoint("/files/*", HTTP_GET, files);
+    addEndpoint("/", HTTP_GET, pages);
+    httpd_uri_t logWebsocketHandler = {
+            .uri= "/ws/log",
+            .method= HTTP_GET,
+            .handler= requestHandler_wsLog,
+            .is_websocket= true
+    };
+    httpd_register_uri_handler(this.server, &logWebsocketHandler);
 
     internalStorage_init();
 
-    fileBuffer = alloc(FILE_BUFFER_SIZE);
-    favIconFileBuffer = alloc(FILE_BUFFER_SIZE);
-    imageBuffer = alloc(CAMERA_IMAGE_BUFFER_SIZE);
-    imagePOSTBuffer = alloc(CAMERA_IMAGE_BUFFER_SIZE);
-    logList = log_getLogList();
-    logList_addOnAppendCallback(logList, onAppendCallback);
-    asyncData = new(WebsocketAsyncData);
+    this.pageBuffer = alloc(FILE_BUFFER_SIZE);
+    this.favIconBuffer = alloc(FILE_BUFFER_SIZE);
+    this.imageBuffer = alloc(CAMERA_IMAGE_BUFFER_SIZE);
+    this.imagePOSTBuffer = alloc(CAMERA_IMAGE_BUFFER_SIZE);
+    this.logList = log_getLogList();
+    logList_addOnAppendCallback(this.logList, logListOnAppendCallback);
     ListOptions socketsListOptions = LIST_DEFAULT_OPTIONS;
     socketsListOptions.isGrowable = true;
     socketsListOptions.capacity = CONFIG_LWIP_MAX_SOCKETS;
-    asyncData->socketsList = list_createWithOptions(&socketsListOptions);
+    this.logWebsocketData.socketsList = list_createWithOptions(&socketsListOptions);
+    this.logWebsocketData.deadSocketsIndices = list_createWithOptions(&socketsListOptions);
 
+    this.isInitialized = true;
+
+    INFO("Web Server successfully initialized!");
     return ERROR_NONE;
 }

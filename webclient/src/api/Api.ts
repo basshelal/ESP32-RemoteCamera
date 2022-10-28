@@ -10,6 +10,10 @@ export class Api {
         return this.join(Constants.ServerURLHost, "api", url)
     }
 
+    private static ws(url: string): string {
+        return this.join(Constants.ServerURLHost, "ws", url).replace("http", "ws")
+    }
+
     public static async getBattery(): Promise<ApiBatteryResponse> {
         const url: string = this.api("battery")
         const response: Response = await fetch(url)
@@ -31,8 +35,7 @@ export class Api {
     }
 
     public static createLogWebSocket(): WebSocket {
-        // TODO: Make the url a bit better
-        const url = this.join(Constants.ServerURLHost, "socket", "log").replace("http", "ws")
+        const url = this.ws("log")
         return new WebSocket(url)
     }
 
