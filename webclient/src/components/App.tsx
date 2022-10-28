@@ -11,7 +11,7 @@ import Router, {RouterOnChangeArgs} from "preact-router"
 import {Redirect} from "./Redirect"
 import {AppContext, AppContextObject, AppContextType, AppPage, DefaultContext} from "./AppContext"
 
-export const App: FC = (): JSXElement => {
+export const App: FC = () => {
 
     const [appContext, setAppContext] = useState<AppContextType>(DefaultContext)
     const [isLoginPage, setIsLoginPage] = useState<boolean>(false)

@@ -1,11 +1,11 @@
-import {FC, JSXElement, useOnce} from "../../Utils"
+import {FC, useOnce} from "../../Utils"
 import styled from "preact-css-styled"
-import {VideoPlayer} from "../ui-elements/VideoPlayer"
 import {useState} from "preact/hooks"
 import {ApiBatteryResponse} from "../../api/Types"
 import {Api} from "../../api/Api"
+import {LivePlayer} from "../ui-elements/LivePlayer"
 
-export const Home: FC = (): JSXElement => {
+export const Home: FC = () => {
 
     const [batteryInfo, setBatteryInfo] = useState<ApiBatteryResponse>()
 
@@ -19,10 +19,10 @@ export const Home: FC = (): JSXElement => {
         ".main { margin-top: 4px } video { width: 100%; margin-left: auto; margin-right: auto }" +
         ".mono { font-family: 'Fira Code', monospace }")
 
-    const BatteryInfo:FC = () => {
+    const BatteryInfo: FC = () => {
         return (<>
             {batteryInfo?.voltage}mV {batteryInfo?.percentage}% {batteryInfo?.isCharging ? "charging" : null}
-            </>)
+        </>)
     }
 
     return (<Root>
@@ -34,8 +34,7 @@ export const Home: FC = (): JSXElement => {
                 <p className="pure-u-1-3 mono" style={{textAlign: "center"}}>Info: Info 1</p>
                 <p className="pure-u-1-3 mono" style={{textAlign: "right"}}>Info: Info 2</p>
             </div>
-
-            <VideoPlayer videoOptions={{autoPlay: false, controls: true, muted: true}}/>
+            <LivePlayer/>
         </div>
     </Root>)
 }

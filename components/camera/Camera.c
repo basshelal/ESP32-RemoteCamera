@@ -12,9 +12,10 @@
 #define I2C_MASTER_FREQ_HZ 400000
 #define SPI_MASTER_FREQ_HZ SPI_MASTER_FREQ_8M
 #define SPI_MAX_TRANSFER_SIZE SOC_SPI_MAXIMUM_BUFFER_SIZE
+#define I2C_DELAY_MILLIS 100
 
 /*
- * Arducam is LSB so bits are in the order 76543210, so 1 in bit 1 is 00000010 or 0x02
+ * Arducam & Sensor are LSB so bits are in the order 76543210, so 1 in bit 1 is 00000010 or 0x02
  */
 
 private struct {
@@ -81,22 +82,22 @@ private void i2cRead(const uint16_t registerAddress,
     i2c_cmd_link_delete(cmdHandle);
 }
 
-private void i2cWriteRegistryEntries(const OV5642RegisterEntry *registerEntries) {
-    const OV5642RegisterEntry *next = registerEntries;
-    OV5642RegisterEntry entry = *registerEntries;
-    while (entry.address != 0xFFFF && entry.value != 0xFF) {
-        i2cWrite(entry.address, &entry.value, sizeof(entry.value));
-        next++;
-        entry = *next;
-        delayMillis(1);
-    }
-}
-
 #define i2cWriteByte(registerAddress, byte) \
 do{                                         \
 const uint8_t value = byte;                 \
-i2cWrite(registerAddress, &value, sizeof(value));\
+i2cWrite(registerAddress, &value, sizeof(value)); \
+delayMillis(I2C_DELAY_MILLIS);                    \
 } while(0)
+
+private void i2cWriteRegistryEntries(const OV5642RegisterEntry *registerEntries) {
+    OV5642RegisterEntry *next = registerEntries;
+    OV5642RegisterEntry entry = *registerEntries;
+    while (entry.address != 0xFFFF && entry.value != 0xFF) {
+        i2cWriteByte(entry.address, entry.value);
+        next++;
+        entry = *next;
+    }
+}
 
 private Error camera_setTestRegister(const uint8_t value) {
     esp_err_t err = spiSendOnly(0x00 | SPI_WRITE, &value, sizeof(value));
@@ -367,6 +368,28 @@ private void camera_showOV5642TestColorBar() {
     i2cWriteByte(0x503e, 0x00);
 }
 
+private void camera_setLightMode() {
+    // Advanced AWB
+    i2cWriteByte(0x3406, 0x00);
+    i2cWriteByte(0x5192, 0x04);
+    i2cWriteByte(0x5191, 0xf8);
+    i2cWriteByte(0x518d, 0x26);
+    i2cWriteByte(0x518f, 0x42);
+    i2cWriteByte(0x518e, 0x2b);
+    i2cWriteByte(0x5190, 0x42);
+    i2cWriteByte(0x518b, 0xd0);
+    i2cWriteByte(0x518c, 0xbd);
+    i2cWriteByte(0x5187, 0x18);
+    i2cWriteByte(0x5188, 0x18);
+    i2cWriteByte(0x5189, 0x56);
+    i2cWriteByte(0x518a, 0x5c);
+    i2cWriteByte(0x5186, 0x1c);
+    i2cWriteByte(0x5181, 0x50);
+    i2cWriteByte(0x5184, 0x20);
+    i2cWriteByte(0x5182, 0x11);
+    i2cWriteByte(0x5183, 0x00);
+}
+
 enum CompressionAmount {
     COMPRESSION_DEFAULT, COMPRESSION_HIGH, COMPRESSION_LOW,
 };
@@ -390,25 +413,30 @@ public Error camera_start() {
 
     i2cWriteRegistryEntries(OV5642_QVGA_Preview);
     i2cWriteRegistryEntries(OV5642_JPEG_Capture_QSXGA);
-    camera_setImageSize(CAMERA_IMAGE_SIZE_DEFAULT);
+    i2cWriteRegistryEntries(OV5642_320x240);
 
     i2cWriteByte(0x3818, 0xa8); // enable compression, vertical flip on
     i2cWriteByte(0x3621, 0x10); // enable mirror function
     i2cWriteByte(0x3801, 0xb0); // ? something to do with enable mirror function as well
-    i2cWriteByte(0x4407, 0x08); // QS Quantization scale, ie compression quality
     i2cWriteByte(0x5888, 0x00); // ? something to do with lens correction
     i2cWriteByte(0x5000, 0xFF); // General functions all enabled
+    i2cWriteByte(0x5001, 0x7f); // Disable special effects like filters
+    i2cWriteByte(0x5580, 0x00); // same as above
     camera_setCompressionAmount(COMPRESSION_DEFAULT);
+    camera_setImageSize(CAMERA_IMAGE_SIZE_DEFAULT);
+    camera_setLightMode();
 
+    camera_setVSyncPolarity(false);
     camera_setFramesToCapture(1);
     camera_resetFIFOWrite();
     camera_resetFIFORead();
+
+    INFO("Camera started successfully");
 
     return ERROR_NONE;
 }
 
 public Error camera_captureImage(uint32_t *imageSize) {
-    camera_setVSyncPolarity(false);
     camera_resetFIFOWrite();
     camera_resetFIFORead();
     camera_clearFIFOWriteDoneFlag();

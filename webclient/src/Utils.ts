@@ -1,6 +1,7 @@
-import {FunctionComponent, JSX} from "preact"
+import {FunctionComponent, JSX, RenderableProps} from "preact"
 import {EffectCallback, useEffect} from "preact/hooks"
 
+export type P<T> = RenderableProps<T>
 export type FC<P = {}> = FunctionComponent<P>
 export  type JSXElement = JSX.Element
 
@@ -10,7 +11,7 @@ export class Constants {
 }
 
 export function useOnce(once: EffectCallback): void {
-    useEffect(once, [false])
+    useEffect(once, [])
 }
 
 export class Logger {

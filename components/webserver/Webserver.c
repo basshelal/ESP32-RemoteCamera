@@ -16,6 +16,7 @@ private httpd_handle_t server;
 private void *fileBuffer;
 private void *favIconFileBuffer;
 private char *imageBuffer;
+private char *imagePOSTBuffer;
 private LogList *logList;
 
 #define requestHandler(endpoint, name) private esp_err_t requestHandler_ ## name(httpd_req_t *request)
@@ -193,6 +194,19 @@ private void cameraReadCallback(char *buffer, int bufferSize, void *userArgs) {
     httpd_resp_send_chunk(request, buffer, bufferSize);
 }
 
+requestHandler("/api/cameraSettings", cameraSettings) {
+    allowCORS(request);
+
+    httpd_req_recv(request, imagePOSTBuffer, CAMERA_IMAGE_BUFFER_SIZE);
+
+    INFO("%s", imagePOSTBuffer);
+
+    httpd_resp_set_status(request, HTTPD_200);
+    finishRequest(request);
+
+    return ESP_OK;
+}
+
 requestHandler("/api/camera", apiCamera) {
     allowCORS(request);
 
@@ -306,9 +320,6 @@ public Error webserver_init() {
     httpd_uri_t favIconHandler = {.uri= "/pages/favicon.*", .method= HTTP_GET, .handler= requestHandler_favIcon};
     httpd_register_uri_handler(server, &favIconHandler);
 
-    httpd_uri_t blobHandler = {.uri= "/pages/blob*", .method= HTTP_GET, .handler= requestHandler_404};
-    httpd_register_uri_handler(server, &blobHandler);
-
     httpd_uri_t webPageHandler = {.uri= "/pages*", .method= HTTP_GET, .handler= requestHandler_pages};
     httpd_register_uri_handler(server, &webPageHandler);
 
@@ -320,6 +331,9 @@ public Error webserver_init() {
 
     httpd_uri_t cameraApiHandler = {.uri= "/api/camera", .method= HTTP_GET, .handler= requestHandler_apiCamera};
     httpd_register_uri_handler(server, &cameraApiHandler);
+
+    httpd_uri_t cameraApiPostHandler = {.uri= "/api/cameraSettings", .method= HTTP_POST, .handler= requestHandler_cameraSettings};
+    httpd_register_uri_handler(server, &cameraApiPostHandler);
 
     httpd_uri_t logSocketHandler = {.uri= "/socket/log", .method= HTTP_GET, .handler= requestHandler_socketLog,
             .is_websocket= true};
@@ -338,6 +352,7 @@ public Error webserver_init() {
     fileBuffer = alloc(FILE_BUFFER_SIZE);
     favIconFileBuffer = alloc(FILE_BUFFER_SIZE);
     imageBuffer = alloc(CAMERA_IMAGE_BUFFER_SIZE);
+    imagePOSTBuffer = alloc(CAMERA_IMAGE_BUFFER_SIZE);
     logList = log_getLogList();
     logList_addOnAppendCallback(logList, onAppendCallback);
     asyncData = new(WebsocketAsyncData);
