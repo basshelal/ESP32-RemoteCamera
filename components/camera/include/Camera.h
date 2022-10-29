@@ -17,6 +17,9 @@ typedef enum CameraImageSize {
 
 typedef void CameraReadCallback(char *buffer, int bufferSize, void *userArgs);
 
+typedef void CameraLiveCaptureCallback(uint8_t *buffer, size_t bufferLength,
+                                       uint32_t totalImageSize);
+
 extern Error camera_init();
 
 /** Initializes the camera to its default values ready to use, can be called multiple times to restart camera */
@@ -29,6 +32,8 @@ extern Error camera_destroy();
 extern Error camera_captureImage(uint32_t *imageSize);
 
 extern Error camera_setImageSize(const CameraImageSize imageSize);
+
+extern Error camera_setCameraLiveCaptureCallback(CameraLiveCaptureCallback cameraLiveCaptureCallback);
 
 extern Error camera_readImageBufferedWithCallback(char *buffer, const int bufferLength,
                                                   const uint32_t imageSize,

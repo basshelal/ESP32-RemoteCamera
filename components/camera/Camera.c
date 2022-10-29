@@ -18,9 +18,10 @@
 #define I2C_DELAY_MILLIS 100
 
 #define CAMERA_TASK_NAME "cameraTask"
-#define CAMERA_TASK_STACK_SIZE 3000
+#define CAMERA_TASK_STACK_SIZE 4000
 #define CAMERA_TASK_STACK_MIN (CAMERA_TASK_STACK_SIZE * 0.10)
 #define CAMERA_TASK_PRIORITY ((configMAX_PRIORITIES - 1)/2)
+#define CAMERA_LIVE_IMAGE_BUFFER_SIZE 4096
 
 /*
  * Arducam & Sensor are LSB so bits are in the order 76543210, so 1 in bit 1 is 00000010 or 0x02
@@ -34,8 +35,14 @@ private struct {
         bool isRunning;
         bool isPaused;
         uint32_t delayMillis;
+        uint8_t *liveImageBuffer;
+        size_t liveImageBufferLength;
+        CameraLiveCaptureCallback *liveCaptureCallback;
     } task;
 } this;
+
+#define obtainMutex() xSemaphoreTake(this.semaphoreHandle, portMAX_DELAY)
+#define releaseMutex() xSemaphoreGive(this.semaphoreHandle)
 
 private esp_err_t spiSend(const uint16_t command,
                           const uint8_t *const sendData, const size_t sendDataLength,
@@ -274,6 +281,7 @@ private Error camera_waitForFIFODone() {
 }
 
 public Error camera_setImageSize(const CameraImageSize imageSize) {
+    obtainMutex();
     switch (imageSize) {
         case CAMERA_IMAGE_SIZE_320x240:
             i2cWriteRegistryEntries(OV5642_320x240);
@@ -297,6 +305,7 @@ public Error camera_setImageSize(const CameraImageSize imageSize) {
             i2cWriteRegistryEntries(OV5642_2592x1944);
             break;
     }
+    releaseMutex();
     return ERROR_NONE;
 }
 
@@ -383,33 +392,12 @@ private void camera_showOV5642TestColorBar() {
     i2cWriteByte(0x503e, 0x00);
 }
 
-private void camera_setLightMode() {
-    // Advanced AWB
-    i2cWriteByte(0x3406, 0x00);
-    i2cWriteByte(0x5192, 0x04);
-    i2cWriteByte(0x5191, 0xf8);
-    i2cWriteByte(0x518d, 0x26);
-    i2cWriteByte(0x518f, 0x42);
-    i2cWriteByte(0x518e, 0x2b);
-    i2cWriteByte(0x5190, 0x42);
-    i2cWriteByte(0x518b, 0xd0);
-    i2cWriteByte(0x518c, 0xbd);
-    i2cWriteByte(0x5187, 0x18);
-    i2cWriteByte(0x5188, 0x18);
-    i2cWriteByte(0x5189, 0x56);
-    i2cWriteByte(0x518a, 0x5c);
-    i2cWriteByte(0x5186, 0x1c);
-    i2cWriteByte(0x5181, 0x50);
-    i2cWriteByte(0x5184, 0x20);
-    i2cWriteByte(0x5182, 0x11);
-    i2cWriteByte(0x5183, 0x00);
-}
-
 enum CompressionAmount {
     COMPRESSION_DEFAULT, COMPRESSION_HIGH, COMPRESSION_LOW,
 };
 
 private void camera_setCompressionAmount(const enum CompressionAmount compressionAmount) {
+    obtainMutex();
     switch (compressionAmount) {
         case COMPRESSION_DEFAULT:
             i2cWriteByte(0x4407, 0x04); // average, default
@@ -421,11 +409,10 @@ private void camera_setCompressionAmount(const enum CompressionAmount compressio
             i2cWriteByte(0x4407, 0x02); // low compression, high quality image
             break;
     }
+    releaseMutex();
 }
 
 private void camera_taskFunction(void *arg) {
-    // TODO: 29-Oct-2022 @basshelal: Need to use some kind of mutexing in every camera modification
-    //  because we don't want concurrent camera accesses or modifications
     taskWatcher_notifyTaskStarted(CAMERA_TASK_NAME);
     typeof(this) *thisPtr = (typeof(this) *) arg;
     uint remaining = 0;
@@ -437,7 +424,24 @@ private void camera_taskFunction(void *arg) {
             break;
         }
         if (!thisPtr->task.isPaused) {
-            INFO("Camera task running!");
+            if (thisPtr->task.liveCaptureCallback && thisPtr->task.liveImageBuffer) {
+                uint32_t imageSize;
+                camera_captureImage(&imageSize);
+                INFO("Captured size: %u", imageSize);
+                obtainMutex();
+                uint8_t *buffer = thisPtr->task.liveImageBuffer;
+                const int bufferLength = (int) thisPtr->task.liveImageBufferLength;
+                for (int bytesRemaining = (int) imageSize; bytesRemaining > 0;) {
+                    const int bytesToRead = bytesRemaining > bufferLength ? bufferLength : (int) bytesRemaining;
+                    camera_burstFIFORead(buffer, bytesToRead);
+                    INFO("BufferLength: %u", bytesToRead);
+                    if (thisPtr->task.liveCaptureCallback) {
+                        thisPtr->task.liveCaptureCallback(buffer, bytesToRead, imageSize);
+                    }
+                    bytesRemaining -= bytesToRead;
+                }
+                releaseMutex();
+            }
         }
         delayMillis(thisPtr->task.delayMillis);
     }
@@ -463,6 +467,7 @@ private void camera_startCameraTask() {
 
 public Error camera_start() {
     this.semaphoreHandle = xSemaphoreCreateBinary();
+    releaseMutex(); // FreeRTOS always starts it as obtained so we must release first
     i2cWriteByte(0x3008, 0x80); // Full sensor reset
 
     i2cWriteRegistryEntries(OV5642_QVGA_Preview);
@@ -476,9 +481,27 @@ public Error camera_start() {
     i2cWriteByte(0x5000, 0xFF); // General functions all enabled
     i2cWriteByte(0x5001, 0x7f); // Disable special effects like filters
     i2cWriteByte(0x5580, 0x00); // same as above
+    // Advanced AWB Light mode
+    i2cWriteByte(0x3406, 0x00);
+    i2cWriteByte(0x5192, 0x04);
+    i2cWriteByte(0x5191, 0xf8);
+    i2cWriteByte(0x518d, 0x26);
+    i2cWriteByte(0x518f, 0x42);
+    i2cWriteByte(0x518e, 0x2b);
+    i2cWriteByte(0x5190, 0x42);
+    i2cWriteByte(0x518b, 0xd0);
+    i2cWriteByte(0x518c, 0xbd);
+    i2cWriteByte(0x5187, 0x18);
+    i2cWriteByte(0x5188, 0x18);
+    i2cWriteByte(0x5189, 0x56);
+    i2cWriteByte(0x518a, 0x5c);
+    i2cWriteByte(0x5186, 0x1c);
+    i2cWriteByte(0x5181, 0x50);
+    i2cWriteByte(0x5184, 0x20);
+    i2cWriteByte(0x5182, 0x11);
+    i2cWriteByte(0x5183, 0x00);
     camera_setCompressionAmount(COMPRESSION_DEFAULT);
     camera_setImageSize(CAMERA_IMAGE_SIZE_DEFAULT);
-    camera_setLightMode();
 
     camera_setVSyncPolarity(false);
     camera_setFramesToCapture(1);
@@ -491,6 +514,7 @@ public Error camera_start() {
 }
 
 public Error camera_captureImage(uint32_t *imageSize) {
+    obtainMutex();
     camera_resetFIFOWrite();
     camera_resetFIFORead();
     camera_clearFIFOWriteDoneFlag();
@@ -499,6 +523,8 @@ public Error camera_captureImage(uint32_t *imageSize) {
     camera_waitForFIFODone();
 
     camera_getWriteFIFOSize(imageSize);
+
+    releaseMutex();
     return ERROR_NONE;
 }
 
@@ -506,7 +532,9 @@ public Error camera_init() {
     throwIfError(camera_initBuses(), "");
     throwIfError(camera_start(), "");
 
-    this.task.delayMillis = 1000;
+    this.task.liveImageBufferLength = CAMERA_LIVE_IMAGE_BUFFER_SIZE;
+    this.task.liveImageBuffer = alloc(this.task.liveImageBufferLength);
+    this.task.delayMillis = 3000;
     TaskInfo taskInfo = {
             .name = CAMERA_TASK_NAME,
             .stackBytes = CAMERA_TASK_STACK_SIZE,
@@ -522,9 +550,15 @@ public Error camera_destroy() {
     return ERROR_NONE;
 }
 
+public Error camera_setCameraLiveCaptureCallback(CameraLiveCaptureCallback cameraLiveCaptureCallback){
+    this.task.liveCaptureCallback = cameraLiveCaptureCallback;
+    return ERROR_NONE;
+}
+
 public Error camera_readImageBufferedWithCallback(char *buffer, const int bufferLength,
                                                   const uint32_t imageSize,
                                                   CameraReadCallback readCallback, void *userArg) {
+    obtainMutex();
     for (int i = (int) imageSize; i >= 0;) {
         const int bytesToRead = imageSize > bufferLength ? bufferLength : (int) imageSize;
         camera_burstFIFORead((uint8_t *) buffer, bytesToRead);
@@ -532,5 +566,6 @@ public Error camera_readImageBufferedWithCallback(char *buffer, const int buffer
         i -= bytesToRead;
     }
 
+    releaseMutex();
     return ERROR_NONE;
 }

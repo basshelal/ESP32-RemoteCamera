@@ -28,6 +28,9 @@ private struct {
     struct {
         List *socketsList; // list of sockets, a socket is an int
         List *deadSockets; // sockets no longer available
+        uint8_t *imageBuffer;
+        size_t imageBufferLength;
+        uint32_t totalImageSize;
     } cameraWebsocketData;
 } this;
 
@@ -305,22 +308,20 @@ requestHandler(files, "/files/*") {
     return ESP_OK;
 }
 
-private void clearLogDeadSocketsList() {
-    for (int i = 0; i < list_getSize(this.logWebsocketData.deadSockets); i++) {
-        int *socketPtr = list_getItem(this.logWebsocketData.socketsList, i);
-        list_removeItem(this.logWebsocketData.socketsList, socketPtr);
+private void clearLogDeadSocketsList(List *deadSockets, List *socketsList) {
+    for (int i = 0; i < list_getSize(deadSockets); i++) {
+        int *socketPtr = list_getItem(socketsList, i);
+        list_removeItem(socketsList, socketPtr);
         INFO("Removed socket fd: %i", *socketPtr);
         free(socketPtr);
     }
-    list_clear(this.logWebsocketData.deadSockets);
+    list_clear(deadSockets);
 }
 
 private void sendLogToWebSocketClients(void *arg) {
     typeof(this.logWebsocketData) *websocketDataPtr = ((typeof(this.logWebsocketData) *) arg);
     if (!websocketDataPtr) return;
     typeof(this.logWebsocketData) websocketData = *websocketDataPtr;
-    ListOptions options = LIST_DEFAULT_OPTIONS;
-    options.capacity = list_getSize(websocketData.socketsList);
     for (int i = 0; i < list_getSize(websocketData.socketsList); i++) {
         int *socketPtr = list_getItem(websocketData.socketsList, i);
         if (!socketPtr) continue;
@@ -337,12 +338,48 @@ private void sendLogToWebSocketClients(void *arg) {
             }
         }
     }
-    clearLogDeadSocketsList();
+    clearLogDeadSocketsList(websocketData.deadSockets, websocketData.socketsList);
 }
 
 private void logListOnAppendCallback(const LogList *_logList, const char *string) {
     this.logWebsocketData.logString = string;
-    httpd_queue_work(this.server, sendLogToWebSocketClients, &this.logWebsocketData);
+    sendLogToWebSocketClients(&this.logWebsocketData);
+    // TODO: 29-Oct-2022 @basshelal: Verify that this synchronous approach works
+//    httpd_queue_work(this.server, sendLogToWebSocketClients, &this.logWebsocketData);
+}
+
+private void sendLiveImageToWebsocketClients(void *arg) {
+    typeof(this.cameraWebsocketData) *websocketDataPtr = ((typeof(this.cameraWebsocketData) *) arg);
+    if (!websocketDataPtr) return;
+    typeof(this.cameraWebsocketData) websocketData = *websocketDataPtr;
+    for (int i = 0; i < list_getSize(websocketData.socketsList); i++) {
+        int *socketPtr = list_getItem(websocketData.socketsList, i);
+        if (!socketPtr) continue;
+        int socketNumber = *socketPtr;
+        char string[16];
+        sprintf(string, "%u", websocketData.imageBufferLength);
+        httpd_ws_frame_t websocketFrame = {
+                .type = HTTPD_WS_TYPE_TEXT,
+                .payload = (uint8_t *) string,
+                .len = strlen(string),
+        };
+        esp_err_t err = httpd_ws_send_frame_async(this.server, socketNumber, &websocketFrame);
+        if (err) {
+            if (err == ESP_ERR_INVALID_ARG) {
+                list_addItem(websocketData.deadSockets, socketPtr);
+            }
+        }
+    }
+    clearLogDeadSocketsList(websocketData.deadSockets, websocketData.socketsList);
+}
+
+private void cameraLiveCaptureCallback(uint8_t *buffer, size_t bufferLength,
+                                       uint32_t totalImageSize) {
+
+    this.cameraWebsocketData.imageBuffer = buffer;
+    this.cameraWebsocketData.imageBufferLength = bufferLength;
+    this.cameraWebsocketData.totalImageSize = totalImageSize;
+    sendLiveImageToWebsocketClients(&this.cameraWebsocketData);
 }
 
 public Error webserver_init() {
@@ -398,6 +435,11 @@ public Error webserver_init() {
     socketsListOptions.capacity = CONFIG_LWIP_MAX_SOCKETS;
     this.logWebsocketData.socketsList = list_createWithOptions(&socketsListOptions);
     this.logWebsocketData.deadSockets = list_createWithOptions(&socketsListOptions);
+
+    this.cameraWebsocketData.socketsList = list_createWithOptions(&socketsListOptions);
+    this.cameraWebsocketData.deadSockets = list_createWithOptions(&socketsListOptions);
+
+    camera_setCameraLiveCaptureCallback(cameraLiveCaptureCallback);
 
     this.isInitialized = true;
 
