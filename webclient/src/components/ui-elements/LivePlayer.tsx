@@ -1,87 +1,105 @@
-import {JSXElement, P, useOnce} from "../../Utils"
+import {JSXElement, Logger, P, useOnce} from "../../Utils"
 import {MutableRef, useRef, useState} from "preact/hooks"
 import {Slider} from "./Slider"
 import {CameraSettings, DefaultCameraSettings, ImageSize, imageSizeToString} from "../../api/Types"
+import {Api} from "../../api/Api"
 
 export interface LivePlayerProps {
 }
 
+const updateCameraSettingsDelayMillis = 500
+
 export const LivePlayer = (props: P<LivePlayerProps>): JSXElement => {
 
     const imageRef: MutableRef<HTMLImageElement> = useRef<HTMLImageElement>(document.getElementById("livePlayerImage") as HTMLImageElement)
-    const [imageSettings, setImageSettings] = useState<CameraSettings>(DefaultCameraSettings)
-    const [queuedImageSettings, setQueuedImageSettings] = useState<CameraSettings | null>(null)
+    const [cameraSettings, setCameraSettings] = useState<CameraSettings>(DefaultCameraSettings)
+    const queuedCameraSettingsRef: MutableRef<CameraSettings> = useRef<CameraSettings>({})
+    const updateSettingsTimeoutRef: MutableRef<number> = useRef<number>(0)
+    const webSocketRef: MutableRef<WebSocket | null> = useRef<WebSocket | null>(null)
 
     useOnce(() => {
         imageRef.current = document.getElementById("livePlayerImage") as HTMLImageElement
-        setInterval(() => {
-            if (imageRef.current) {
-                const time = new Date().valueOf()
-                imageRef.current.src = `http://192.168.0.123/api/camera?time=${time}`
+        imageRef.current.src = "http://192.168.0.123/api/camera"
+        // webSocketRef.current = Api.createCameraWebSocket()
+        // webSocketRef.current!.onerror = (event) => {
+        //     Logger.error("Websocket error")
+        // }
+        // webSocketRef.current!.onmessage = (messageEvent: MessageEvent) => {
+        //     Logger.info(`WebSocket data: ${messageEvent.data}`)
+        // }
+        return () => { // cleanup
+            if (webSocketRef.current?.readyState == WebSocket.OPEN) {
+                webSocketRef.current?.close()
             }
-        }, 1000)
+        }
     })
 
-    const updateImageSettings = (newImageSettings: CameraSettings) => {
-        setImageSettings((oldImageSettings: CameraSettings) => {
-            return {...oldImageSettings, ...newImageSettings}
+    const updateCameraSettings = (newCameraSettings: CameraSettings) => {
+        queuedCameraSettingsRef.current = {...queuedCameraSettingsRef.current, ...newCameraSettings}
+        setCameraSettings((oldCameraSettings: CameraSettings) => {
+            return {...oldCameraSettings, ...newCameraSettings}
         })
-        // TODO: Queue settings changes to minimize server POST hits, use timers and intervals for this, maybe
-        //  batching all changes into after 500ms of no more changes
-        // Api.postCameraSettings(newImageSettings)
+        if (updateSettingsTimeoutRef.current != 0) {
+            window.clearTimeout(updateSettingsTimeoutRef.current)
+        }
+        updateSettingsTimeoutRef.current = window.setTimeout(() => {
+            Api.postCameraSettings(queuedCameraSettingsRef.current)
+            queuedCameraSettingsRef.current = {}
+            updateSettingsTimeoutRef.current = 0
+        }, updateCameraSettingsDelayMillis)
     }
 
     return (<div>
         <img id="livePlayerImage" ref={imageRef} style={{width: "90vw", height: "auto"}}/>
 
         <Slider id="framerate"
-                label={`Framerate: ${imageSettings.frameRate} Hz`}
-                min={1} max={20} value={imageSettings.frameRate}
-                onInput={(value) => updateImageSettings({frameRate: value})}/>
+                label={`Framerate: ${cameraSettings.frameRate} Hz`}
+                min={1} max={20} value={cameraSettings.frameRate}
+                onInput={(value) => updateCameraSettings({frameRate: value})}/>
 
         <Slider id="imageSize"
-                label={`Image Size: ${imageSizeToString(imageSettings.imageSize)}`}
-                min={ImageSize.IMAGE_SIZE_320x240} max={ImageSize.IMAGE_SIZE_2592x1944} value={imageSettings.imageSize}
-                onInput={(value) => updateImageSettings({imageSize: value})}/>
+                label={`Image Size: ${imageSizeToString(cameraSettings.imageSize)}`}
+                min={ImageSize.IMAGE_SIZE_320x240} max={ImageSize.IMAGE_SIZE_2592x1944} value={cameraSettings.imageSize}
+                onInput={(value) => updateCameraSettings({imageSize: value})}/>
 
         <Slider id="minutesUntilStandby"
-                label={`Standby after minutes idle: ${imageSettings.minutesUntilStandby}`}
-                min={1} max={60} value={imageSettings.minutesUntilStandby}
-                onInput={(value) => updateImageSettings({minutesUntilStandby: value})}/>
+                label={`Standby after minutes idle: ${cameraSettings.minutesUntilStandby}`}
+                min={1} max={60} value={cameraSettings.minutesUntilStandby}
+                onInput={(value) => updateCameraSettings({minutesUntilStandby: value})}/>
 
         <Slider id="saturation"
-                label={`saturation: ${imageSettings.saturation}`}
-                min={-4} max={4} value={imageSettings.saturation}
-                onInput={(value) => updateImageSettings({saturation: value})}/>
+                label={`saturation: ${cameraSettings.saturation}`}
+                min={-4} max={4} value={cameraSettings.saturation}
+                onInput={(value) => updateCameraSettings({saturation: value})}/>
 
         <Slider id="brightness"
-                label={`brightness: ${imageSettings.brightness}`}
-                min={-4} max={4} value={imageSettings.brightness}
-                onInput={(value) => updateImageSettings({brightness: value})}/>
+                label={`brightness: ${cameraSettings.brightness}`}
+                min={-4} max={4} value={cameraSettings.brightness}
+                onInput={(value) => updateCameraSettings({brightness: value})}/>
 
         <Slider id="contrast"
-                label={`contrast: ${imageSettings.contrast}`}
-                min={-4} max={4} value={imageSettings.contrast}
-                onInput={(value) => updateImageSettings({contrast: value})}/>
+                label={`contrast: ${cameraSettings.contrast}`}
+                min={-4} max={4} value={cameraSettings.contrast}
+                onInput={(value) => updateCameraSettings({contrast: value})}/>
 
         <Slider id="exposure"
-                label={`exposure: ${imageSettings.exposure}`}
-                min={-4} max={4} value={imageSettings.exposure}
-                onInput={(value) => updateImageSettings({exposure: value})}/>
+                label={`exposure: ${cameraSettings.exposure}`}
+                min={-4} max={4} value={cameraSettings.exposure}
+                onInput={(value) => updateCameraSettings({exposure: value})}/>
 
         <Slider id="sharpness"
-                label={`sharpness: ${imageSettings.sharpness}`}
-                min={-4} max={4} value={imageSettings.sharpness}
-                onInput={(value) => updateImageSettings({sharpness: value})}/>
+                label={`sharpness: ${cameraSettings.sharpness}`}
+                min={-4} max={4} value={cameraSettings.sharpness}
+                onInput={(value) => updateCameraSettings({sharpness: value})}/>
 
         <Slider id="mirrorFlip"
-                label={`mirrorFlip: ${imageSettings.mirrorFlip}`}
-                min={-4} max={4} value={imageSettings.mirrorFlip}
-                onInput={(value) => updateImageSettings({mirrorFlip: value})}/>
+                label={`mirrorFlip: ${cameraSettings.mirrorFlip}`}
+                min={-4} max={4} value={cameraSettings.mirrorFlip}
+                onInput={(value) => updateCameraSettings({mirrorFlip: value})}/>
 
         <Slider id="compressionQuality"
-                label={`compressionQuality: ${imageSettings.compressionQuality}`}
-                min={-4} max={4} value={imageSettings.compressionQuality}
-                onInput={(value) => updateImageSettings({compressionQuality: value})}/>
+                label={`compressionQuality: ${cameraSettings.compressionQuality}`}
+                min={-4} max={4} value={cameraSettings.compressionQuality}
+                onInput={(value) => updateCameraSettings({compressionQuality: value})}/>
     </div>)
 }

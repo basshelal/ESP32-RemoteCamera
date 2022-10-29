@@ -20,19 +20,11 @@ export const Slider = (props: P<SliderProps>) => {
         }
     }
 
-    const onChange = (event: Event) => {
-        const value = (event.target as HTMLInputElement).valueAsNumber
-        if (props.onChanged && value) {
-            props.onChanged(value)
-        }
-    }
-
     return (<div>
         <label htmlFor={`${props.id}Slider`}>{props.label}</label>
         <input type="range" id={props.id} name={`${props.id}Slider`}
                min={props.min} max={props.max} value={props.value}
                step={props.step ? props.step : 1}
-               onInput={onInput}
-               onChange={onChange}/>
+               onInput={onInput}/>
     </div>)
 }

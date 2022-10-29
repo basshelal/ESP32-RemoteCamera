@@ -22,7 +22,7 @@ private struct {
     LogList *logList;
     struct {
         List *socketsList; // list of sockets, a socket is an int
-        List *deadSocketsIndices; // index of a socket in socketsList that is no longer available
+        List *deadSockets; // sockets no longer available
         const char *logString; // string to send through log websocket
     } logWebsocketData;
 } this;
@@ -198,7 +198,10 @@ requestHandler(apiBattery, "/api/battery") {
 
 private void cameraReadCallback(char *buffer, int bufferSize, void *userArgs) {
     httpd_req_t *request = (httpd_req_t *) userArgs;
-    httpd_resp_send_chunk(request, buffer, bufferSize);
+    esp_err_t err = httpd_resp_send_chunk(request, buffer, bufferSize);
+    if (err) {
+        ERROR("httpd_resp_send_chunk() returned: %i: %s", err, esp_err_to_name(err));
+    }
 }
 
 requestHandler(cameraSettings, "/api/cameraSettings") {
@@ -219,6 +222,7 @@ requestHandler(apiCamera, "/api/camera") {
 
     uint32_t imageSize;
     Error err = camera_captureImage(&imageSize);
+    INFO("Captured image size: %u", imageSize);
     if (err == ERROR_NONE) {
         httpd_resp_set_type(request, "image/jpeg");
         camera_readImageBufferedWithCallback(this.imageBuffer, CAMERA_IMAGE_BUFFER_SIZE, imageSize,
@@ -274,16 +278,14 @@ requestHandler(files, "/files/*") {
     return ESP_OK;
 }
 
-private void clearDeadSocketsList() {
-    for (int i = 0; i < list_getSize(this.logWebsocketData.deadSocketsIndices); i++) {
-        int *indexPtr = list_getItem(this.logWebsocketData.deadSocketsIndices, i);
-        int *socketNumber = list_getItem(this.logWebsocketData.socketsList, *indexPtr);
-        list_removeItemIndexed(this.logWebsocketData.socketsList, *indexPtr);
-        INFO("Removed socket fd: %i", *socketNumber);
-        free(indexPtr);
-        free(socketNumber);
+private void clearLogDeadSocketsList() {
+    for (int i = 0; i < list_getSize(this.logWebsocketData.deadSockets); i++) {
+        int *socketPtr = list_getItem(this.logWebsocketData.socketsList, i);
+        list_removeItem(this.logWebsocketData.socketsList, socketPtr);
+        INFO("Removed socket fd: %i", *socketPtr);
+        free(socketPtr);
     }
-    list_clear(this.logWebsocketData.deadSocketsIndices);
+    list_clear(this.logWebsocketData.deadSockets);
 }
 
 private void sendLogToWebSocketClients(void *arg) {
@@ -295,21 +297,20 @@ private void sendLogToWebSocketClients(void *arg) {
     for (int i = 0; i < list_getSize(websocketData.socketsList); i++) {
         int *socketPtr = list_getItem(websocketData.socketsList, i);
         if (!socketPtr) continue;
+        int socketNumber = *socketPtr;
         httpd_ws_frame_t websocketFrame = {
                 .type = HTTPD_WS_TYPE_TEXT,
                 .payload = websocketData.logString,
                 .len = strlen(websocketData.logString),
         };
-        esp_err_t err = httpd_ws_send_frame_async(this.server, *socketPtr, &websocketFrame);
+        esp_err_t err = httpd_ws_send_frame_async(this.server, socketNumber, &websocketFrame);
         if (err) {
             if (err == ESP_ERR_INVALID_ARG) {
-                int *indexPtr = new(int);
-                *indexPtr = i;
-                list_addItem(websocketData.deadSocketsIndices, indexPtr);
+                list_addItem(websocketData.deadSockets, socketPtr);
             }
         }
     }
-    clearDeadSocketsList();
+    clearLogDeadSocketsList();
 }
 
 private void logListOnAppendCallback(const LogList *_logList, const char *string) {
@@ -362,7 +363,7 @@ public Error webserver_init() {
     socketsListOptions.isGrowable = true;
     socketsListOptions.capacity = CONFIG_LWIP_MAX_SOCKETS;
     this.logWebsocketData.socketsList = list_createWithOptions(&socketsListOptions);
-    this.logWebsocketData.deadSocketsIndices = list_createWithOptions(&socketsListOptions);
+    this.logWebsocketData.deadSockets = list_createWithOptions(&socketsListOptions);
 
     this.isInitialized = true;
 

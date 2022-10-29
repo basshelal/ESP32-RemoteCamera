@@ -1,4 +1,4 @@
-import {ApiBatteryResponse, CameraSettings, ApiError, ApiLogResponse} from "./Types"
+import {ApiBatteryResponse, ApiError, ApiLogResponse, CameraSettings} from "./Types"
 import {Constants} from "../Utils"
 
 export class Api {
@@ -34,6 +34,11 @@ export class Api {
         }
     }
 
+    public static createCameraWebSocket(): WebSocket {
+        const url = this.ws("camera")
+        return new WebSocket(url)
+    }
+
     public static createLogWebSocket(): WebSocket {
         const url = this.ws("log")
         return new WebSocket(url)
@@ -41,9 +46,9 @@ export class Api {
 
     public static async postCameraSettings(cameraSettings: CameraSettings) {
         const url = this.api("cameraSettings")
-        const body = JSON.stringify(cameraSettings)
-        console.log(body)
-        const response: Response = await fetch(url, {method: "POST", body: body})
+        const json = JSON.stringify(cameraSettings)
+        console.log(json)
+        const response: Response = await fetch(url, {method: "POST", body: json})
         if (!response.ok) {
             throw new ApiError(url, response)
         }
