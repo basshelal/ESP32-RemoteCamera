@@ -4,6 +4,9 @@
 #include "OV5642.h"
 #include <driver/spi_master.h>
 #include "driver/i2c.h"
+#include "TaskWatcher.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #define SPI_WRITE 0x80
 #define SPI_READ  0x00
@@ -14,12 +17,24 @@
 #define SPI_MAX_TRANSFER_SIZE SOC_SPI_MAXIMUM_BUFFER_SIZE
 #define I2C_DELAY_MILLIS 100
 
+#define CAMERA_TASK_NAME "cameraTask"
+#define CAMERA_TASK_STACK_SIZE 3000
+#define CAMERA_TASK_STACK_MIN (CAMERA_TASK_STACK_SIZE * 0.10)
+#define CAMERA_TASK_PRIORITY ((configMAX_PRIORITIES - 1)/2)
+
 /*
  * Arducam & Sensor are LSB so bits are in the order 76543210, so 1 in bit 1 is 00000010 or 0x02
  */
 
 private struct {
     spi_device_handle_t spiDeviceHandle;
+    SemaphoreHandle_t semaphoreHandle;
+    struct {
+        TaskHandle_t handle;
+        bool isRunning;
+        bool isPaused;
+        uint32_t delayMillis;
+    } task;
 } this;
 
 private esp_err_t spiSend(const uint16_t command,
@@ -408,7 +423,46 @@ private void camera_setCompressionAmount(const enum CompressionAmount compressio
     }
 }
 
+private void camera_taskFunction(void *arg) {
+    // TODO: 29-Oct-2022 @basshelal: Need to use some kind of mutexing in every camera modification
+    //  because we don't want concurrent camera accesses or modifications
+    taskWatcher_notifyTaskStarted(CAMERA_TASK_NAME);
+    typeof(this) *thisPtr = (typeof(this) *) arg;
+    uint remaining = 0;
+    while (thisPtr->task.isRunning) {
+        remaining = uxTaskGetStackHighWaterMark(thisPtr->task.handle);
+        if (remaining < CAMERA_TASK_STACK_MIN) { // quit task if we run out of stack to avoid program crash
+            ERROR("Camera task ran out of stack, bytes remaining: %u", remaining);
+            this.task.isRunning = false;
+            break;
+        }
+        if (!thisPtr->task.isPaused) {
+            INFO("Camera task running!");
+        }
+        delayMillis(thisPtr->task.delayMillis);
+    }
+    taskWatcher_notifyTaskStopped(
+            /*taskName=*/CAMERA_TASK_NAME,
+            /*shouldRestart=*/true,
+            /*remainingStackBytes=*/remaining);
+    vTaskDelete(thisPtr->task.handle);
+}
+
+private void camera_startCameraTask() {
+    this.task.isRunning = true;
+    this.task.isPaused = false;
+    xTaskCreate(
+            /*pvTaskCode=*/camera_taskFunction,
+            /*pcName=*/CAMERA_TASK_NAME,
+            /*usStackDepth=*/CAMERA_TASK_STACK_SIZE,
+            /*pvParameters=*/&this,
+            /*uxPriority=*/CAMERA_TASK_PRIORITY,
+            /*pxCreatedTask=*/this.task.handle
+    );
+}
+
 public Error camera_start() {
+    this.semaphoreHandle = xSemaphoreCreateBinary();
     i2cWriteByte(0x3008, 0x80); // Full sensor reset
 
     i2cWriteRegistryEntries(OV5642_QVGA_Preview);
@@ -451,6 +505,15 @@ public Error camera_captureImage(uint32_t *imageSize) {
 public Error camera_init() {
     throwIfError(camera_initBuses(), "");
     throwIfError(camera_start(), "");
+
+    this.task.delayMillis = 1000;
+    TaskInfo taskInfo = {
+            .name = CAMERA_TASK_NAME,
+            .stackBytes = CAMERA_TASK_STACK_SIZE,
+            .startFunction = camera_startCameraTask
+    };
+    taskWatcher_registerTask(&taskInfo);
+    camera_startCameraTask();
 
     return ERROR_NONE;
 }

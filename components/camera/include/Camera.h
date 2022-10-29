@@ -2,6 +2,7 @@
 #define ESP32_REMOTECAMERA_CAMERA_H
 
 #include "Error.h"
+#include <stdbool.h>
 
 typedef enum CameraImageSize {
     CAMERA_IMAGE_SIZE_320x240 = 0,
@@ -20,6 +21,8 @@ extern Error camera_init();
 
 /** Initializes the camera to its default values ready to use, can be called multiple times to restart camera */
 extern Error camera_start();
+
+extern Error camera_pauseLiveCapture(bool pause);
 
 extern Error camera_destroy();
 

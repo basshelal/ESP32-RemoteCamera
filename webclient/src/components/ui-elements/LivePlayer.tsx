@@ -20,13 +20,13 @@ export const LivePlayer = (props: P<LivePlayerProps>): JSXElement => {
     useOnce(() => {
         imageRef.current = document.getElementById("livePlayerImage") as HTMLImageElement
         imageRef.current.src = "http://192.168.0.123/api/camera"
-        // webSocketRef.current = Api.createCameraWebSocket()
-        // webSocketRef.current!.onerror = (event) => {
-        //     Logger.error("Websocket error")
-        // }
-        // webSocketRef.current!.onmessage = (messageEvent: MessageEvent) => {
-        //     Logger.info(`WebSocket data: ${messageEvent.data}`)
-        // }
+        webSocketRef.current = Api.createCameraWebSocket()
+        webSocketRef.current!.onerror = (event) => {
+            Logger.error("Websocket error")
+        }
+        webSocketRef.current!.onmessage = (messageEvent: MessageEvent) => {
+            Logger.info(`WebSocket data: ${messageEvent.data}`)
+        }
         return () => { // cleanup
             if (webSocketRef.current?.readyState == WebSocket.OPEN) {
                 webSocketRef.current?.close()

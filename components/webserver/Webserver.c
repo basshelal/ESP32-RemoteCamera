@@ -25,6 +25,10 @@ private struct {
         List *deadSockets; // sockets no longer available
         const char *logString; // string to send through log websocket
     } logWebsocketData;
+    struct {
+        List *socketsList; // list of sockets, a socket is an int
+        List *deadSockets; // sockets no longer available
+    } cameraWebsocketData;
 } this;
 
 #define requestHandler(name, uri) private esp_err_t requestHandler_ ## name(httpd_req_t *request)
@@ -259,6 +263,29 @@ requestHandler(wsLog, "/ws/log") {
     return ESP_OK;
 }
 
+requestHandler(wsCamera, "/ws/camera") {
+    allowCORS(request);
+    INFO("URI: %s", request->uri);
+    INFO("Method: %s", http_method_str(request->method));
+    int socketNumber = httpd_req_to_sockfd(request);
+    if (socketNumber == -1) return ESP_OK;
+    int *socketNumberPtr = new(int);
+    *socketNumberPtr = socketNumber;
+    index_t foundIndex = list_indexOfItemFunction(this.cameraWebsocketData.socketsList, socketNumberPtr,
+                                                  socketsListIntEquals);
+    if (foundIndex == LIST_INVALID_INDEX_CAPACITY) {
+        INFO("New socket fd: %i", socketNumber);
+        list_addItem(this.cameraWebsocketData.socketsList, socketNumberPtr);
+    } else {
+        free(socketNumberPtr);
+    }
+    if (request->method == HTTP_GET) {
+        httpd_resp_set_status(request, HTTPD_200);
+        return ESP_OK;
+    }
+    return ESP_OK;
+}
+
 requestHandler(files, "/files/*") {
     allowCORS(request);
     INFO("URI: %s", request->uri);
@@ -350,6 +377,13 @@ public Error webserver_init() {
             .is_websocket= true
     };
     httpd_register_uri_handler(this.server, &logWebsocketHandler);
+    httpd_uri_t cameraWebsocketHandler = {
+            .uri= "/ws/camera",
+            .method= HTTP_GET,
+            .handler= requestHandler_wsCamera,
+            .is_websocket= true
+    };
+    httpd_register_uri_handler(this.server, &cameraWebsocketHandler);
 
     internalStorage_init();
 
