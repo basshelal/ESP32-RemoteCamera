@@ -434,11 +434,11 @@ private void camera_taskFunction(void *arg) {
                 for (int bytesRemaining = (int) imageSize; bytesRemaining > 0;) {
                     const int bytesToRead = bytesRemaining > bufferLength ? bufferLength : (int) bytesRemaining;
                     camera_burstFIFORead(buffer, bytesToRead);
-                    INFO("BufferLength: %u", bytesToRead);
-                    if (thisPtr->task.liveCaptureCallback) {
-                        thisPtr->task.liveCaptureCallback(buffer, bytesToRead, imageSize);
-                    }
                     bytesRemaining -= bytesToRead;
+                    if (thisPtr->task.liveCaptureCallback) {
+                        thisPtr->task.liveCaptureCallback(buffer, bytesToRead,
+                                                          imageSize - bytesRemaining, bytesRemaining);
+                    }
                 }
                 releaseMutex();
             }
@@ -550,7 +550,7 @@ public Error camera_destroy() {
     return ERROR_NONE;
 }
 
-public Error camera_setCameraLiveCaptureCallback(CameraLiveCaptureCallback cameraLiveCaptureCallback){
+public Error camera_setCameraLiveCaptureCallback(CameraLiveCaptureCallback cameraLiveCaptureCallback) {
     this.task.liveCaptureCallback = cameraLiveCaptureCallback;
     return ERROR_NONE;
 }

@@ -30,7 +30,8 @@ private struct {
         List *deadSockets; // sockets no longer available
         uint8_t *imageBuffer;
         size_t imageBufferLength;
-        uint32_t totalImageSize;
+        size_t bytesRead;
+        size_t bytesRemaining;
     } cameraWebsocketData;
 } this;
 
@@ -311,9 +312,11 @@ requestHandler(files, "/files/*") {
 private void clearLogDeadSocketsList(List *deadSockets, List *socketsList) {
     for (int i = 0; i < list_getSize(deadSockets); i++) {
         int *socketPtr = list_getItem(socketsList, i);
-        list_removeItem(socketsList, socketPtr);
-        INFO("Removed socket fd: %i", *socketPtr);
-        free(socketPtr);
+        if (socketPtr) {
+            list_removeItem(socketsList, socketPtr);
+            INFO("Removed socket fd: %i", *socketPtr);
+            free(socketPtr);
+        }
     }
     list_clear(deadSockets);
 }
@@ -352,16 +355,24 @@ private void sendLiveImageToWebsocketClients(void *arg) {
     typeof(this.cameraWebsocketData) *websocketDataPtr = ((typeof(this.cameraWebsocketData) *) arg);
     if (!websocketDataPtr) return;
     typeof(this.cameraWebsocketData) websocketData = *websocketDataPtr;
+    const uint8_t *buffer = websocketData.imageBuffer;
+    const size_t bufferLength = websocketData.imageBufferLength;
+    const size_t bytesRead = websocketData.bytesRead;
+    const size_t bytesRemaining = websocketData.bytesRemaining;
+    const bool isFinalFrame = bytesRemaining == 0;
+//    INFO("Length: %u Read: %u, Remaining: %u %s",
+//         bufferLength, bytesRead, bytesRemaining, isFinalFrame ? "[FINAL]" : "");
     for (int i = 0; i < list_getSize(websocketData.socketsList); i++) {
         int *socketPtr = list_getItem(websocketData.socketsList, i);
         if (!socketPtr) continue;
         int socketNumber = *socketPtr;
-        char string[16];
-        sprintf(string, "%u", websocketData.imageBufferLength);
+        INFO("Socket: %i", socketNumber);
         httpd_ws_frame_t websocketFrame = {
-                .type = HTTPD_WS_TYPE_TEXT,
-                .payload = (uint8_t *) string,
-                .len = strlen(string),
+                .type = HTTPD_WS_TYPE_BINARY,
+                .payload = buffer,
+                .len = bufferLength,
+                .fragmented = true,
+                .final = true
         };
         esp_err_t err = httpd_ws_send_frame_async(this.server, socketNumber, &websocketFrame);
         if (err) {
@@ -374,11 +385,12 @@ private void sendLiveImageToWebsocketClients(void *arg) {
 }
 
 private void cameraLiveCaptureCallback(uint8_t *buffer, size_t bufferLength,
-                                       uint32_t totalImageSize) {
+                                       size_t bytesRead, size_t bytesRemaining) {
 
     this.cameraWebsocketData.imageBuffer = buffer;
     this.cameraWebsocketData.imageBufferLength = bufferLength;
-    this.cameraWebsocketData.totalImageSize = totalImageSize;
+    this.cameraWebsocketData.bytesRead = bytesRead;
+    this.cameraWebsocketData.bytesRemaining = bytesRemaining;
     sendLiveImageToWebsocketClients(&this.cameraWebsocketData);
 }
 
