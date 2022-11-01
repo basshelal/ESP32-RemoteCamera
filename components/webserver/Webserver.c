@@ -261,7 +261,6 @@ requestHandler(wsLog, "/ws/log") {
         free(socketNumberPtr);
     }
     if (request->method == HTTP_GET) {
-        httpd_resp_set_status(request, HTTPD_200);
         return ESP_OK;
     }
     return ESP_OK;
@@ -284,7 +283,6 @@ requestHandler(wsCamera, "/ws/camera") {
         free(socketNumberPtr);
     }
     if (request->method == HTTP_GET) {
-        httpd_resp_set_status(request, HTTPD_200);
         return ESP_OK;
     }
     return ESP_OK;
@@ -360,19 +358,21 @@ private void sendLiveImageToWebsocketClients(void *arg) {
     const size_t bytesRead = websocketData.bytesRead;
     const size_t bytesRemaining = websocketData.bytesRemaining;
     const bool isFinalFrame = bytesRemaining == 0;
-//    INFO("Length: %u Read: %u, Remaining: %u %s",
-//         bufferLength, bytesRead, bytesRemaining, isFinalFrame ? "[FINAL]" : "");
+    const bool isFirstFrame = bytesRead == bufferLength;
     for (int i = 0; i < list_getSize(websocketData.socketsList); i++) {
         int *socketPtr = list_getItem(websocketData.socketsList, i);
         if (!socketPtr) continue;
         int socketNumber = *socketPtr;
-        INFO("Socket: %i", socketNumber);
+        if (httpd_ws_get_fd_info(this.server, socketNumber) != HTTPD_WS_CLIENT_WEBSOCKET) {
+            list_addItem(websocketData.deadSockets, socketPtr);
+            continue;
+        }
         httpd_ws_frame_t websocketFrame = {
-                .type = HTTPD_WS_TYPE_BINARY,
+                .type =  isFirstFrame ? HTTPD_WS_TYPE_BINARY : HTTPD_WS_TYPE_CONTINUE,
                 .payload = buffer,
                 .len = bufferLength,
                 .fragmented = true,
-                .final = true
+                .final = isFinalFrame
         };
         esp_err_t err = httpd_ws_send_frame_async(this.server, socketNumber, &websocketFrame);
         if (err) {

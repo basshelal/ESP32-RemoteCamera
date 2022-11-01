@@ -57,6 +57,8 @@ private esp_err_t spiSend(const uint16_t command,
         tx.length = sendDataLength * BYTE_TO_BITS;
     }
 
+    // TODO: 01-Nov-2022 @basshelal: Performance improvements for camera capture delay can be done here
+    //  by avoid a polling and just adding the spi transaction to the spi queue
     esp_err_t err = spi_device_polling_transmit(this.spiDeviceHandle, &tx);
     return err;
 }
@@ -122,14 +124,13 @@ private void i2cWriteRegistryEntries(const OV5642RegisterEntry *registerEntries)
 }
 
 private Error camera_setTestRegister(const uint8_t value) {
-    esp_err_t err = spiSendOnly(0x00 | SPI_WRITE, &value, sizeof(value));
-    ESP_ERROR_CHECK(err);
+    spiSendOnly(0x00 | SPI_WRITE, &value, sizeof(value));
     return ERROR_NONE;
 }
 
 private Error camera_getTestRegister(uint8_t *const value) {
-    esp_err_t err = spiReceiveOnly(0x00 | SPI_READ, value, sizeof(uint8_t));
-    ESP_ERROR_CHECK(err);
+    spiReceiveOnly(0x00 | SPI_READ, value, sizeof(uint8_t));
+
     return ERROR_NONE;
 }
 
@@ -137,15 +138,14 @@ private Error camera_setFramesToCapture(uint8_t framesCount) {
     framesCount--;
     if (framesCount > 7) framesCount = 7;
 
-    esp_err_t err = spiSendOnly(0x01 | SPI_WRITE, &framesCount, sizeof(framesCount));
-    ESP_ERROR_CHECK(err);
+    spiSendOnly(0x01 | SPI_WRITE, &framesCount, sizeof(framesCount));
+
     return ERROR_NONE;
 }
 
 private Error camera_getFramesToCapture(uint8_t *const framesCount) {
     uint8_t receivedData = 0;
-    esp_err_t err = spiReceiveOnly(0x01 | SPI_READ, &receivedData, sizeof(receivedData));
-    ESP_ERROR_CHECK(err);
+    spiReceiveOnly(0x01 | SPI_READ, &receivedData, sizeof(receivedData));
     *framesCount = ++receivedData;
     return ERROR_NONE;
 }
@@ -155,15 +155,14 @@ private Error camera_getHSyncPolarity();
 
 private Error camera_setVSyncPolarity(const bool isVsyncOn) {
     const uint8_t data = ((uint8_t) (!isVsyncOn)) << 1;
-    esp_err_t err = spiSendOnly(0x03 | SPI_WRITE, &data, sizeof(data));
-    ESP_ERROR_CHECK(err);
+    spiSendOnly(0x03 | SPI_WRITE, &data, sizeof(data));
+
     return ERROR_NONE;
 }
 
 private Error camera_getVSyncPolarity(bool *const isVsyncOn) {
     uint8_t receivedData = 0;
-    esp_err_t err = spiReceiveOnly(0x03 | SPI_READ, &receivedData, sizeof(receivedData));
-    ESP_ERROR_CHECK(err);
+    spiReceiveOnly(0x03 | SPI_READ, &receivedData, sizeof(receivedData));
 
     const uint8_t vsyncResult = receivedData & 0x02; // vsync is bit 1
     *isVsyncOn = !((bool) vsyncResult);
@@ -172,46 +171,41 @@ private Error camera_getVSyncPolarity(bool *const isVsyncOn) {
 
 private Error camera_clearFIFOWriteDoneFlag() {
     uint8_t data = 0x01;
-    esp_err_t err = spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
-    ESP_ERROR_CHECK(err);
+    spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
     return ERROR_NONE;
 }
 
 private Error camera_startCapture() {
     uint8_t data = 0x02;
-    esp_err_t err = spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
-    ESP_ERROR_CHECK(err);
+    spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
+
     return ERROR_NONE;
 }
 
 private Error camera_resetFIFOWrite() {
     uint8_t data = 0x10;
-    esp_err_t err = spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
-    ESP_ERROR_CHECK(err);
+    spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
     return ERROR_NONE;
 }
 
 private Error camera_resetFIFORead() {
     uint8_t data = 0x20;
-    esp_err_t err = spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
-    ESP_ERROR_CHECK(err);
+    spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
     return ERROR_NONE;
 }
 
 // TODO: 25-Oct-2022 @basshelal: Sensor standby and sensor low power
 
 private Error camera_burstFIFORead(uint8_t *const byteBuffer, const int bufferLength) {
+    spi_transaction_t tx = {
+            .cmd = 0x03C | SPI_READ,
+            .tx_buffer = NULL,
+    };
     for (int bytesRemaining = bufferLength, bytesRead = 0; bytesRemaining > 0;) {
         const int bytesToRead = bufferLength > SPI_MAX_TRANSFER_SIZE ? SPI_MAX_TRANSFER_SIZE : bufferLength;
-
-        spi_transaction_t tx = {
-                .cmd = 0x03C | SPI_READ,
-                .tx_buffer = NULL,
-                .rxlength = (size_t) bytesToRead * BYTE_TO_BITS,
-                .rx_buffer = byteBuffer + bytesRead,
-        };
-        esp_err_t err = spi_device_polling_transmit(this.spiDeviceHandle, &tx);
-        ESP_ERROR_CHECK_WITHOUT_ABORT(err);
+        tx.rxlength = (size_t) bytesToRead * BYTE_TO_BITS;
+        tx.rx_buffer = byteBuffer + bytesRead;
+        spi_device_polling_transmit(this.spiDeviceHandle, &tx);
 
         bytesRemaining -= bytesToRead;
         bytesRead += bytesToRead;
@@ -222,8 +216,7 @@ private Error camera_burstFIFORead(uint8_t *const byteBuffer, const int bufferLe
 
 private Error camera_singleFIFORead(uint8_t *const byteReceived) {
     uint8_t receivedData = 0;
-    esp_err_t err = spiReceiveOnly(0x03D | SPI_READ, &receivedData, sizeof(receivedData));
-    ESP_ERROR_CHECK(err);
+    spiReceiveOnly(0x03D | SPI_READ, &receivedData, sizeof(receivedData));
 
     *byteReceived = receivedData;
     return ERROR_NONE;
@@ -244,26 +237,21 @@ private Error camera_getVSyncPinStatus();
 
 private Error camera_getFIFOWriteDoneFlag(bool *const isFIFODone) {
     uint8_t receivedData = 0;
-    esp_err_t err = spiReceiveOnly(0x41 | SPI_READ, &receivedData, sizeof(receivedData));
-    ESP_ERROR_CHECK(err);
+    spiReceiveOnly(0x41 | SPI_READ, &receivedData, sizeof(receivedData));
     *isFIFODone = (receivedData & 0x08) == 0x08;
     return ERROR_NONE;
 }
 
 private Error camera_getWriteFIFOSize(uint32_t *const fifoLength) {
-    esp_err_t err;
 
     uint8_t result1 = 0;
-    err = spiReceiveOnly(0x42 | SPI_READ, &result1, sizeof(result1));
-    ESP_ERROR_CHECK(err);
+    spiReceiveOnly(0x42 | SPI_READ, &result1, sizeof(result1));
 
     uint8_t result2 = 0;
-    err = spiReceiveOnly(0x43 | SPI_READ, &result2, sizeof(result2));
-    ESP_ERROR_CHECK(err);
+    spiReceiveOnly(0x43 | SPI_READ, &result2, sizeof(result2));
 
     uint8_t result3 = 0;
-    err = spiReceiveOnly(0x44 | SPI_READ, &result3, sizeof(result3));
-    ESP_ERROR_CHECK(err);
+    spiReceiveOnly(0x44 | SPI_READ, &result3, sizeof(result3));
 
     result3 &= 0x7F; // 0x44 returns a 7 bit number, ignore bit 7
 
@@ -416,6 +404,13 @@ private void camera_taskFunction(void *arg) {
     taskWatcher_notifyTaskStarted(CAMERA_TASK_NAME);
     typeof(this) *thisPtr = (typeof(this) *) arg;
     uint remaining = 0;
+    uint32_t imageSize;
+    uint32_t captureTime = UINT32_MAX;
+    uint32_t framesTaken = 0;
+    uint32_t now;
+    float frameRate;
+    float totalFrameRate = 0.0F;
+    float averageFrameRate;
     while (thisPtr->task.isRunning) {
         remaining = uxTaskGetStackHighWaterMark(thisPtr->task.handle);
         if (remaining < CAMERA_TASK_STACK_MIN) { // quit task if we run out of stack to avoid program crash
@@ -425,9 +420,20 @@ private void camera_taskFunction(void *arg) {
         }
         if (!thisPtr->task.isPaused) {
             if (thisPtr->task.liveCaptureCallback && thisPtr->task.liveImageBuffer) {
-                uint32_t imageSize;
+                now = esp_log_early_timestamp();
+                const uint32_t delay = now > captureTime ? now - captureTime : 0;
+                if (delay > 0) {
+                    framesTaken++;
+                    frameRate = 1000.0F / (float) delay;
+                    totalFrameRate += frameRate;
+                    averageFrameRate = totalFrameRate / (float) framesTaken;
+                    INFO("%.2f = %.2f / %.2f", averageFrameRate, totalFrameRate, (float) framesTaken);
+                }
+                captureTime = esp_log_early_timestamp();
                 camera_captureImage(&imageSize);
-                INFO("Captured size: %u", imageSize);
+                now = esp_log_early_timestamp();
+                const uint32_t millisTook = now >= captureTime ? now - captureTime : 0;
+                INFO("Capture size: %u, time %u ms", imageSize, millisTook);
                 obtainMutex();
                 uint8_t *buffer = thisPtr->task.liveImageBuffer;
                 const int bufferLength = (int) thisPtr->task.liveImageBufferLength;
@@ -534,7 +540,7 @@ public Error camera_init() {
 
     this.task.liveImageBufferLength = CAMERA_LIVE_IMAGE_BUFFER_SIZE;
     this.task.liveImageBuffer = alloc(this.task.liveImageBufferLength);
-    this.task.delayMillis = 3000;
+    this.task.delayMillis = 10;
     TaskInfo taskInfo = {
             .name = CAMERA_TASK_NAME,
             .stackBytes = CAMERA_TASK_STACK_SIZE,
