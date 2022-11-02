@@ -316,7 +316,7 @@ private Error camera_initBuses() {
             .clock_speed_hz = SPI_MASTER_FREQ_HZ,
             .mode = 0,
             .spics_io_num = 5,
-            .queue_size = 1,
+            .queue_size = 32,
             .flags = SPI_DEVICE_HALFDUPLEX
     };
     err = spi_bus_add_device(VSPI_HOST, &spiDeviceConfig, &this.spiDeviceHandle);
@@ -405,12 +405,9 @@ private void camera_taskFunction(void *arg) {
     typeof(this) *thisPtr = (typeof(this) *) arg;
     uint remaining = 0;
     uint32_t imageSize;
-    uint32_t captureTime = UINT32_MAX;
-    uint32_t framesTaken = 0;
-    uint32_t now;
-    float frameRate;
-    float totalFrameRate = 0.0F;
-    float averageFrameRate;
+    uint32_t frameDelay;
+    uint32_t captureDelay;
+    uint32_t readDelay;
     while (thisPtr->task.isRunning) {
         remaining = uxTaskGetStackHighWaterMark(thisPtr->task.handle);
         if (remaining < CAMERA_TASK_STACK_MIN) { // quit task if we run out of stack to avoid program crash
@@ -420,23 +417,14 @@ private void camera_taskFunction(void *arg) {
         }
         if (!thisPtr->task.isPaused) {
             if (thisPtr->task.liveCaptureCallback && thisPtr->task.liveImageBuffer) {
-                now = esp_log_early_timestamp();
-                const uint32_t delay = now > captureTime ? now - captureTime : 0;
-                if (delay > 0) {
-                    framesTaken++;
-                    frameRate = 1000.0F / (float) delay;
-                    totalFrameRate += frameRate;
-                    averageFrameRate = totalFrameRate / (float) framesTaken;
-                    INFO("%.2f = %.2f / %.2f", averageFrameRate, totalFrameRate, (float) framesTaken);
-                }
-                captureTime = esp_log_early_timestamp();
+                frameDelay = esp_log_early_timestamp();
+                captureDelay = esp_log_early_timestamp();
                 camera_captureImage(&imageSize);
-                now = esp_log_early_timestamp();
-                const uint32_t millisTook = now >= captureTime ? now - captureTime : 0;
-                INFO("Capture size: %u, time %u ms", imageSize, millisTook);
+                captureDelay = esp_log_early_timestamp() - captureDelay;
                 obtainMutex();
                 uint8_t *buffer = thisPtr->task.liveImageBuffer;
                 const int bufferLength = (int) thisPtr->task.liveImageBufferLength;
+                readDelay = esp_log_early_timestamp();
                 for (int bytesRemaining = (int) imageSize; bytesRemaining > 0;) {
                     const int bytesToRead = bytesRemaining > bufferLength ? bufferLength : (int) bytesRemaining;
                     camera_burstFIFORead(buffer, bytesToRead);
@@ -446,7 +434,11 @@ private void camera_taskFunction(void *arg) {
                                                           imageSize - bytesRemaining, bytesRemaining);
                     }
                 }
+                readDelay = esp_log_early_timestamp() - readDelay;
                 releaseMutex();
+                frameDelay = esp_log_early_timestamp() - frameDelay;
+                INFO("cap: %u ms, read: %u ms, tot: %u ms, fps: %.2f Hz",
+                     captureDelay, readDelay, frameDelay, 1000.0F / (float) frameDelay);
             }
         }
         delayMillis(thisPtr->task.delayMillis);
@@ -506,8 +498,8 @@ public Error camera_start() {
     i2cWriteByte(0x5184, 0x20);
     i2cWriteByte(0x5182, 0x11);
     i2cWriteByte(0x5183, 0x00);
-    camera_setCompressionAmount(COMPRESSION_DEFAULT);
-    camera_setImageSize(CAMERA_IMAGE_SIZE_DEFAULT);
+    camera_setCompressionAmount(COMPRESSION_HIGH);
+    camera_setImageSize(CAMERA_IMAGE_SIZE_640x480);
 
     camera_setVSyncPolarity(false);
     camera_setFramesToCapture(1);
