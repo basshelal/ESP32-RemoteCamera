@@ -63,29 +63,13 @@ private Error externalStorage_mountSDCard() {
     return ERROR_NONE;
 }
 
-private void externalStorage_autoMountTaskFunction(void *arg);
-
-private void externalStorage_startAutoMountTask() {
-    this.task.isRunning = true;
-    xTaskCreate(
-            /*pvTaskCode=*/externalStorage_autoMountTaskFunction,
-            /*pcName=*/AUTOMOUNT_TASK_NAME,
-            /*usStackDepth=*/AUTOMOUNT_TASK_STACK_SIZE,
-            /*pvParameters=*/&this,
-            /*uxPriority=*/AUTOMOUNT_TASK_PRIORITY,
-            /*pxCreatedTask=*/this.task.handle
-    );
-}
-
 private void externalStorage_autoMountTaskFunction(void *arg) {
-    taskWatcher_notifyTaskStarted(AUTOMOUNT_TASK_NAME);
     typeof(this) *thisPtr = (typeof(this) *) arg;
-    uint remaining = 0;
+    uint32_t stackMinBytes = 0;
     while (thisPtr->task.isRunning) {
-        remaining = uxTaskGetStackHighWaterMark(thisPtr->task.handle);
-        if (remaining < AUTOMOUNT_TASK_STACK_MIN) {
-            ERROR("Automount task ran out of stack, bytes remaining: %u", remaining);
-            this.task.isRunning = false;
+        if ((taskWatcher_getTaskStackMinFreeBytes(AUTOMOUNT_TASK_NAME, &stackMinBytes) == ERROR_NONE) &&
+            stackMinBytes < AUTOMOUNT_TASK_STACK_MIN) { // quit task if we run out of stack to avoid program crash
+            ERROR("Automount task ran out of stack, most bytes used: %u", stackMinBytes);
             break;
         }
         const bool oldHasSDCard = thisPtr->hasSDCard;
@@ -100,14 +84,9 @@ private void externalStorage_autoMountTaskFunction(void *arg) {
                 externalStorage_unmountSDCard();
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(AUTOMOUNT_TASK_POLL_MILLIS));
+        delayMillis(AUTOMOUNT_TASK_POLL_MILLIS);
     }
-    taskWatcher_notifyTaskStopped(
-            /*taskName=*/AUTOMOUNT_TASK_NAME,
-            /*shouldRestart=*/true,
-            /*remainingStackBytes=*/remaining);
-    vTaskDelete(thisPtr->task.handle);
-    thisPtr->task.handle = NULL;
+    taskWatcher_restartTask(AUTOMOUNT_TASK_NAME);
 }
 
 /*============================= Public API ==================================*/
@@ -147,13 +126,17 @@ public Error externalStorage_init(ExternalStorageOptions *externalStorageOptions
     }
 
     if (externalStorageOptions->startAutoMountTask) {
+        this.task.isRunning = true;
         TaskInfo taskInfo = {
                 .name = AUTOMOUNT_TASK_NAME,
+                .taskFunction = externalStorage_autoMountTaskFunction,
                 .stackBytes = AUTOMOUNT_TASK_STACK_SIZE,
-                .startFunction = externalStorage_startAutoMountTask
+                .taskParameter = &this,
+                .taskPriority = AUTOMOUNT_TASK_PRIORITY,
+                .taskHandle = this.task.handle
         };
-        taskWatcher_registerTask(&taskInfo);
-        externalStorage_startAutoMountTask();
+        taskWatcher_addTask(&taskInfo);
+        taskWatcher_startTask(AUTOMOUNT_TASK_NAME);
     }
 
     this.isInitialized = true;

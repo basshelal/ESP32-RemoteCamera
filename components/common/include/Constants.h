@@ -11,9 +11,6 @@
 
 #define CONFIG_LOGGER_LOG_LEVEL CONFIG_LOG_LEVEL_VERBOSE
 
-// 0 to disable TaskWatcher, otherwise it is enabled
-#define CONFIG_USE_TASK_WATCHER 1
-
 // 0 to disable application level error toString functions that are used in error messages
 //  these functions are always inlined and often have a large number of constant strings and are
 //  a way to reduce overall binary size when disabled if needed at the cost of less clear error messages

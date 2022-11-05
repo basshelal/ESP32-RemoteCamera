@@ -44,9 +44,9 @@ private struct {
 #define obtainMutex() xSemaphoreTake(this.semaphoreHandle, portMAX_DELAY)
 #define releaseMutex() xSemaphoreGive(this.semaphoreHandle)
 
-private esp_err_t spiSend(const uint16_t command,
-                          const uint8_t *const sendData, const size_t sendDataLength,
-                          uint8_t *const receiveData, const size_t receiveDataLength) {
+private void spiSend(const uint16_t command,
+                     const uint8_t *const sendData, const size_t sendDataLength,
+                     uint8_t *const receiveData, const size_t receiveDataLength) {
     spi_transaction_t tx = {
             .cmd = command,
             .tx_buffer = sendData,
@@ -57,10 +57,7 @@ private esp_err_t spiSend(const uint16_t command,
         tx.length = sendDataLength * BYTE_TO_BITS;
     }
 
-    // TODO: 01-Nov-2022 @basshelal: Performance improvements for camera capture delay can be done here
-    //  by avoid a polling and just adding the spi transaction to the spi queue
-    esp_err_t err = spi_device_polling_transmit(this.spiDeviceHandle, &tx);
-    return err;
+    spi_device_polling_transmit(this.spiDeviceHandle, &tx);
 }
 
 #define spiSendOnly(command, sendData, sendDataLength) spiSend(command, sendData, sendDataLength, NULL, 0)
@@ -71,14 +68,14 @@ private void i2cWrite(const uint16_t registerAddress,
     const uint8_t firstByte = registerAddress >> 8;
     const uint8_t secondByte = registerAddress & 0x00FF;
     i2c_cmd_handle_t cmdHandle = i2c_cmd_link_create();
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_start(cmdHandle));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, OV5642_I2C_DEVICE_ADDRESS_WRITE, true));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, firstByte, true));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, secondByte, true));
+    i2c_master_start(cmdHandle);
+    i2c_master_write_byte(cmdHandle, OV5642_I2C_DEVICE_ADDRESS_WRITE, true);
+    i2c_master_write_byte(cmdHandle, firstByte, true);
+    i2c_master_write_byte(cmdHandle, secondByte, true);
     if (sendDataLength > 0 && sendData != NULL) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write(cmdHandle, sendData, sendDataLength, true));
+        i2c_master_write(cmdHandle, sendData, sendDataLength, true);
     }
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_stop(cmdHandle));
+    i2c_master_stop(cmdHandle);
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_cmd_begin(I2C_NUM_0, cmdHandle, 1000 / portTICK_RATE_MS));
     i2c_cmd_link_delete(cmdHandle);
 }
@@ -88,20 +85,20 @@ private void i2cRead(const uint16_t registerAddress,
     const uint8_t firstByte = registerAddress >> 8;
     const uint8_t secondByte = registerAddress & 0x00FF;
     i2c_cmd_handle_t cmdHandle = i2c_cmd_link_create();
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_start(cmdHandle));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, OV5642_I2C_DEVICE_ADDRESS_WRITE, true));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, firstByte, true));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, secondByte, true));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_stop(cmdHandle));
+    i2c_master_start(cmdHandle);
+    i2c_master_write_byte(cmdHandle, OV5642_I2C_DEVICE_ADDRESS_WRITE, true);
+    i2c_master_write_byte(cmdHandle, firstByte, true);
+    i2c_master_write_byte(cmdHandle, secondByte, true);
+    i2c_master_stop(cmdHandle);
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_cmd_begin(I2C_NUM_0, cmdHandle, 1000 / portTICK_RATE_MS));
     i2c_cmd_link_delete(cmdHandle);
     cmdHandle = i2c_cmd_link_create();
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_start(cmdHandle));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_write_byte(cmdHandle, OV5642_I2C_DEVICE_ADDRESS_READ, true));
+    i2c_master_start(cmdHandle);
+    i2c_master_write_byte(cmdHandle, OV5642_I2C_DEVICE_ADDRESS_READ, true);
     if (receiveDataLength > 0 && receiveData != NULL) {
-        ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_read(cmdHandle, receiveData, receiveDataLength, I2C_MASTER_NACK));
+        i2c_master_read(cmdHandle, receiveData, receiveDataLength, I2C_MASTER_NACK);
     }
-    ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_stop(cmdHandle));
+    i2c_master_stop(cmdHandle);
     ESP_ERROR_CHECK_WITHOUT_ABORT(i2c_master_cmd_begin(I2C_NUM_0, cmdHandle, 1000 / portTICK_RATE_MS));
     i2c_cmd_link_delete(cmdHandle);
 }
@@ -224,8 +221,7 @@ private Error camera_singleFIFORead(uint8_t *const byteReceived) {
 
 private Error camera_getVersion(uint8_t *const major, uint8_t *const minor) {
     uint8_t receivedData = 0;
-    esp_err_t err = spiReceiveOnly(0x40 | SPI_READ, &receivedData, sizeof(receivedData));
-    ESP_ERROR_CHECK(err);
+    spiReceiveOnly(0x40 | SPI_READ, &receivedData, sizeof(receivedData));
 
     *major = receivedData >> 4;
     *minor = receivedData & 0x0F;
@@ -401,18 +397,16 @@ private void camera_setCompressionAmount(const enum CompressionAmount compressio
 }
 
 private void camera_taskFunction(void *arg) {
-    taskWatcher_notifyTaskStarted(CAMERA_TASK_NAME);
     typeof(this) *thisPtr = (typeof(this) *) arg;
-    uint remaining = 0;
+    uint32_t stackMinBytes = 0;
     uint32_t imageSize;
     uint32_t frameDelay;
     uint32_t captureDelay;
     uint32_t readDelay;
     while (thisPtr->task.isRunning) {
-        remaining = uxTaskGetStackHighWaterMark(thisPtr->task.handle);
-        if (remaining < CAMERA_TASK_STACK_MIN) { // quit task if we run out of stack to avoid program crash
-            ERROR("Camera task ran out of stack, bytes remaining: %u", remaining);
-            this.task.isRunning = false;
+        if ((taskWatcher_getTaskStackMinFreeBytes(CAMERA_TASK_NAME, &stackMinBytes) == ERROR_NONE) &&
+            stackMinBytes < CAMERA_TASK_STACK_MIN) { // quit task if we run out of stack to avoid program crash
+            ERROR("Camera task ran out of stack, most bytes used: %u", stackMinBytes);
             break;
         }
         if (!thisPtr->task.isPaused) {
@@ -443,24 +437,7 @@ private void camera_taskFunction(void *arg) {
         }
         delayMillis(thisPtr->task.delayMillis);
     }
-    taskWatcher_notifyTaskStopped(
-            /*taskName=*/CAMERA_TASK_NAME,
-            /*shouldRestart=*/true,
-            /*remainingStackBytes=*/remaining);
-    vTaskDelete(thisPtr->task.handle);
-}
-
-private void camera_startCameraTask() {
-    this.task.isRunning = true;
-    this.task.isPaused = false;
-    xTaskCreate(
-            /*pvTaskCode=*/camera_taskFunction,
-            /*pcName=*/CAMERA_TASK_NAME,
-            /*usStackDepth=*/CAMERA_TASK_STACK_SIZE,
-            /*pvParameters=*/&this,
-            /*uxPriority=*/CAMERA_TASK_PRIORITY,
-            /*pxCreatedTask=*/this.task.handle
-    );
+    taskWatcher_restartTask(CAMERA_TASK_NAME);
 }
 
 public Error camera_start() {
@@ -533,13 +510,18 @@ public Error camera_init() {
     this.task.liveImageBufferLength = CAMERA_LIVE_IMAGE_BUFFER_SIZE;
     this.task.liveImageBuffer = alloc(this.task.liveImageBufferLength);
     this.task.delayMillis = 10;
+    this.task.isRunning = true;
+    this.task.isPaused = false;
     TaskInfo taskInfo = {
             .name = CAMERA_TASK_NAME,
+            .taskFunction = camera_taskFunction,
             .stackBytes = CAMERA_TASK_STACK_SIZE,
-            .startFunction = camera_startCameraTask
+            .taskParameter = &this,
+            .taskPriority = CAMERA_TASK_PRIORITY,
+            .taskHandle = this.task.handle
     };
-    taskWatcher_registerTask(&taskInfo);
-    camera_startCameraTask();
+    taskWatcher_addTask(&taskInfo);
+    taskWatcher_startTask(CAMERA_TASK_NAME);
 
     return ERROR_NONE;
 }

@@ -9,13 +9,13 @@
 * GET/POST Delete SD Card files
 
 ## Camera
-* Take pictures and or videos, use the webserver and or SD card to check these
+* Camera settings modification over webserver, settings should be saved permanently on SPIFFS
 * Take pictures and store to SD Card
 * Take videos and store to SD Card, videos are in MJPEG format, essentially, moving pictures
-* Livestream, is just a constantly updating image canvas that shows the latest image every x milliseconds
-  to give the illusion of a video, for this another websocket can be used
-* Camera settings such as framerate, resolution and possibly some sensor modifications, these
-  need to be persistent
+* Try to implement concurrent multi-frame capture and read by taking advantage of the Arducam's FIFO
+  so that we can capture 4 (or more) frames and while waiting for capture to finish, start reading the
+  FIFO to minimize time waiting for capture to finish, this may not give huge framerate wins though and
+  will likely add a lot more code complexity because of concurrency management etc
 
 ## WiFi
 * WebServer calls WiFi to see if we can get an internet connection:
@@ -34,6 +34,9 @@
 * Allow (advanced) users to choose and store their desired IP address
 
 ## Generic
+* Allow `List` to not shift or change shape when items are removed to allow for a concurrent 
+  read and modification list, so that you can loop over the list and remove items without problems,
+  maybe also add a function to reshape if desired, gaps in the list (removed items) will just be `NULL`s
 * Create a common `Error` type which every function returns, this enum type contains all possible errors
   and is declared in the `Common` component, it's the best solution to having shared errors
 * Modify all functions to follow improved coding style, all functions return either an ErrorType

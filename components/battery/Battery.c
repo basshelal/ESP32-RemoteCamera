@@ -87,29 +87,15 @@ private float battery_getPercentageFromReading(const uint rawReading, const bool
 
 private void battery_taskFunction(void *arg);
 
-private void battery_startBatteryTask() {
-    this.task.isRunning = true;
-    xTaskCreate(
-            /*pvTaskCode=*/battery_taskFunction,
-            /*pcName=*/BATTERY_TASK_NAME,
-            /*usStackDepth=*/BATTERY_TASK_STACK_SIZE,
-            /*pvParameters=*/&this,
-            /*uxPriority=*/BATTERY_TASK_PRIORITY,
-            /*pxCreatedTask=*/this.task.handle
-    );
-}
-
 private void battery_taskFunction(void *arg) {
-    taskWatcher_notifyTaskStarted(BATTERY_TASK_NAME);
     typeof(this) *thisPtr = (typeof(this) *) arg;
     // initialize previous info to avoid a change event on first run because previous was all 0s
     battery_getInfo(&thisPtr->task.previousBatteryInfo);
-    uint remaining = 0;
+    uint32_t stackMinBytes = 0;
     while (thisPtr->task.isRunning) {
-        remaining = uxTaskGetStackHighWaterMark(thisPtr->task.handle);
-        if (remaining < BATTERY_TASK_STACK_MIN) { // quit task if we run out of stack to avoid program crash
-            ERROR("Battery task ran out of stack, bytes remaining: %u", remaining);
-            this.task.isRunning = false;
+        if ((taskWatcher_getTaskStackMinFreeBytes(BATTERY_TASK_NAME, &stackMinBytes) == ERROR_NONE) &&
+            stackMinBytes < BATTERY_TASK_STACK_MIN) { // quit task if we run out of stack to avoid program crash
+            ERROR("Battery task ran out of stack, most bytes used: %u", stackMinBytes);
             break;
         }
         battery_getInfo(&thisPtr->task.currentBatteryInfo);
@@ -150,13 +136,9 @@ private void battery_taskFunction(void *arg) {
             }
             thisPtr->task.previousBatteryInfo.isCharging = thisPtr->task.currentBatteryInfo.isCharging;
         }
-        vTaskDelay(pdMS_TO_TICKS(BATTERY_TASK_POLL_MILLIS));
+        delayMillis(BATTERY_TASK_POLL_MILLIS);
     }
-    taskWatcher_notifyTaskStopped(
-            /*taskName=*/BATTERY_TASK_NAME,
-            /*shouldRestart=*/true,
-            /*remainingStackBytes=*/remaining);
-    vTaskDelete(thisPtr->task.handle);
+    taskWatcher_restartTask(BATTERY_TASK_NAME);
 }
 
 public Error battery_init() {
@@ -172,11 +154,14 @@ public Error battery_init() {
 
     TaskInfo taskInfo = {
             .name = BATTERY_TASK_NAME,
+            .taskFunction = battery_taskFunction,
             .stackBytes = BATTERY_TASK_STACK_SIZE,
-            .startFunction = battery_startBatteryTask
+            .taskParameter = &this,
+            .taskPriority = BATTERY_TASK_PRIORITY,
+            .taskHandle = this.task.handle
     };
-    taskWatcher_registerTask(&taskInfo);
-    battery_startBatteryTask();
+    taskWatcher_addTask(&taskInfo);
+    taskWatcher_startTask(BATTERY_TASK_NAME);
 
     const adc_bits_width_t batteryBitsWidth = ADC_WIDTH_BIT_12;
     const adc_atten_t batteryAttenuation = ADC_ATTEN_DB_11;

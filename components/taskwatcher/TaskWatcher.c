@@ -1,8 +1,6 @@
 #include "TaskWatcher.h"
 #include "Utils.h"
 
-#if CONFIG_USE_TASK_WATCHER
-
 #include <string.h>
 #include "List.h"
 #include "Logger.h"
@@ -10,10 +8,9 @@
 #include "freertos/task.h"
 
 typedef struct {
-    TaskInfo taskInfo;
-    enum {
-        INVALID, STARTED, STOPPED, SHOULD_RESTART, RESTARTING
-    } state;
+    TaskInfo *taskInfo;
+    TaskState state;
+    bool shouldRestart;
 } Task;
 
 private struct {
@@ -24,7 +21,7 @@ private struct {
 private void findTaskInList(const char *taskName, int *index, Task **taskResult) {
     for (int i = 0; i < list_getSize(this.tasksList); i++) {
         Task *task = list_getItem(this.tasksList, i);
-        if (task != NULL && strcmp(task->taskInfo.name, taskName) == 0) {
+        if (task != NULL && strcmp(task->taskInfo->name, taskName) == 0) {
             *index = i;
             *taskResult = task;
             break;
@@ -34,7 +31,7 @@ private void findTaskInList(const char *taskName, int *index, Task **taskResult)
 
 private bool isTaskInRTOS(const char *taskName) {
     TaskHandle_t handle = xTaskGetHandle(taskName);
-    INFO("Task \"%s\" was %s", taskName, boolToString(handle != NULL));
+    VERBOSE("Task \"%s\" was in RTOS?: %s", taskName, boolToString(handle != NULL));
     return handle != NULL;
 }
 
@@ -53,90 +50,133 @@ public void taskWatcher_init() {
 public void taskWatcher_loop() {
     for (int i = 0; i < list_getSize(this.tasksList); i++) {
         Task *task = list_getItem(this.tasksList, i);
-        if (task != NULL && task->state == SHOULD_RESTART &&
-            task->taskInfo.name != NULL &&
-            !isTaskInRTOS(task->taskInfo.name)) {
-            if (task->taskInfo.startFunction) {
-                INFO("Restarting \"%s\"", task->taskInfo.name);
-                task->state = RESTARTING;
-                task->taskInfo.startFunction();
+        if (task == NULL || task->taskInfo->name == NULL) continue;
+        if (task->shouldRestart) {
+            Error err = taskWatcher_startTask(task->taskInfo->name);
+            if (err == ERROR_NONE) {
+                task->shouldRestart = false;
             }
         }
     }
 }
 
-public void taskWatcher_registerTask(const TaskInfo *taskInfo) {
+public Error taskWatcher_addTask(const TaskInfo *taskInfo) {
     Task *foundTask = NULL;
     int index = -1;
     findTaskInList(taskInfo->name, &index, &foundTask);
     if (foundTask != NULL) {
-        ERROR("Cannot register task, a task already exists with the name: %s", taskInfo->name);
+        throw(ERROR_ILLEGAL_ARGUMENT,
+              "Cannot add task with name: \"%s\", a task with that name already exists",
+              taskInfo->name);
     } else {
         Task *task = new(Task);
-        task->taskInfo = *taskInfo;
-        task->state = INVALID;
+        task->taskInfo = new(TaskInfo);
+        memcpy(task->taskInfo, taskInfo, sizeof(TaskInfo));
+        task->state = TASK_STATE_STOPPED;
+        task->shouldRestart = false;
         list_addItem(this.tasksList, task);
     }
+    return ERROR_NONE;
 }
 
-public void taskWatcher_deregisterTask(const char *taskName) {
-    Task *foundTask = NULL;
+public Error taskWatcher_removeTask(const char *taskName) {
+    Task *task = NULL;
     int index = -1;
-    findTaskInList(taskName, &index, &foundTask);
-    if (foundTask != NULL && index != -1) {
-        list_removeItemIndexed(this.tasksList, index);
-    }
-}
-
-public void taskWatcher_notifyTaskStarted(const char *taskName) {
-    Task *foundTask = NULL;
-    int index = -1;
-    findTaskInList(taskName, &index, &foundTask);
-    if (foundTask != NULL) {
-        foundTask->state = STARTED;
-    }
-}
-
-public void taskWatcher_notifyTaskStopped(const char *taskName,
-                                          const bool shouldRestart,
-                                          const uint32_t remainingStackBytes) {
-    Task *foundTask = NULL;
-    int index = -1;
-    findTaskInList(taskName, &index, &foundTask);
-    if (foundTask != NULL) {
-        if (shouldRestart) {
-            WARN("Task \"%s\" stopped with %u remaining / %u total bytes and will restart",
-                 foundTask->taskInfo.name,
-                 remainingStackBytes,
-                 foundTask->taskInfo.stackBytes);
-            foundTask->state = SHOULD_RESTART;
+    findTaskInList(taskName, &index, &task);
+    if (task == NULL || index == -1) {
+        throw(ERROR_ILLEGAL_ARGUMENT,
+              "Cannot remove task \"%s\", no task with that name exists",
+              taskName);
+    } else {
+        bool inRTOS = isTaskInRTOS(taskName);
+        if (inRTOS || task->state != TASK_STATE_STOPPED) {
+            throw(ERROR_ILLEGAL_STATE,
+                  "Cannot remove task \"%s\", it has not been stopped correctly",
+                  taskName);
         } else {
-            INFO("Task \"%s\" stopped successfully", foundTask->taskInfo.name);
-            foundTask->state = STOPPED;
+            list_removeItemIndexed(this.tasksList, index);
+            delete(task->taskInfo);
+            delete(task);
         }
     }
+    return ERROR_NONE;
 }
 
-#else
-
-public void taskWatcher_init() {
+public Error taskWatcher_startTask(const char *taskName) {
+    Task *task = NULL;
+    int index = -1;
+    findTaskInList(taskName, &index, &task);
+    if (task == NULL) {
+        throw(ERROR_ILLEGAL_ARGUMENT, "Cannot start task \"%s\", no task with that name was found",
+              taskName);
+    }
+    bool inRTOS = isTaskInRTOS(taskName);
+    if (task->state == TASK_STATE_STOPPED && !inRTOS) {
+        BaseType_t created = xTaskCreate(
+                /*pvTaskCode=*/task->taskInfo->taskFunction,
+                /*pcName=*/task->taskInfo->name,
+                /*usStackDepth=*/task->taskInfo->stackBytes,
+                /*pvParameters=*/task->taskInfo->taskParameter,
+                /*uxPriority=*/task->taskInfo->taskPriority,
+                /*pxCreatedTask=*/task->taskInfo->taskHandle
+        );
+        if (created != pdPASS) {
+            throw(ERROR_LIBRARY_FAILURE, "FreeRTOS could not create task \"%s\", error code: %i",
+                  taskName, created);
+        }
+        task->state = TASK_STATE_STARTED;
+    } else {
+        throw(ERROR_ILLEGAL_STATE,
+              "Cannot start task \"%s\", task is not in stopped state", taskName);
+    }
+    return ERROR_NONE;
 }
 
-public void taskWatcher_loop() {
+public Error taskWatcher_stopTask(const char *taskName) {
+    Task *task = NULL;
+    int index = -1;
+    findTaskInList(taskName, &index, &task);
+    if (task == NULL) {
+        throw(ERROR_ILLEGAL_ARGUMENT, "Cannot stop task \"%s\", no task with that name was found",
+              taskName);
+    }
+    bool inRTOS = isTaskInRTOS(taskName);
+    if (task->state != TASK_STATE_STARTED) {
+        throw(ERROR_ILLEGAL_STATE,
+              "Cannot stop task \"%s\", task is not in started state", taskName);
+    }
+    if (inRTOS) {
+        vTaskDelete(task->taskInfo->taskHandle);
+    }
+    task->state = TASK_STATE_STOPPED;
+    return ERROR_NONE;
 }
 
-public void taskWatcher_registerTask(const TaskInfo *taskInfo) {
+public Error taskWatcher_restartTask(const char *taskName) {
+    Task *task = NULL;
+    int index = -1;
+    findTaskInList(taskName, &index, &task);
+    if (task == NULL) {
+        throw(ERROR_ILLEGAL_ARGUMENT, "Cannot restart task \"%s\", no task with that name was found",
+              taskName);
+    }
+    Error err = taskWatcher_stopTask(taskName);
+    if (err) return err;
+    task->shouldRestart = true;
+    return ERROR_NONE;
 }
 
-public void taskWatcher_deregisterTask(const char *taskName) {
+public Error taskWatcher_getTaskStackMinFreeBytes(const char *taskName, uint32_t *stackSizeBytes) {
+    Task *task = NULL;
+    int index = -1;
+    findTaskInList(taskName, &index, &task);
+    if (task == NULL) {
+        throw(ERROR_ILLEGAL_ARGUMENT, "No task found with name \"%s\"", taskName);
+    }
+    bool inRTOS = isTaskInRTOS(taskName);
+    if (!inRTOS) {
+        throw(ERROR_ILLEGAL_STATE, "Task \"%s\" was not found in RTOS, likely stopped", taskName);
+    }
+    *stackSizeBytes = uxTaskGetStackHighWaterMark(task->taskInfo->taskHandle);
+    return ERROR_NONE;
 }
-
-public void taskWatcher_notifyTaskStarted(const char *taskName) {
-}
-
-public void taskWatcher_notifyTaskStopped(const char *taskName,
-                                          const bool shouldRestart,
-                                          const uint32_t remainingStackBytes) {
-}
-
-#endif // CONFIG_USE_TASK_WATCHER
