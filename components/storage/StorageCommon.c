@@ -55,7 +55,7 @@ private Error storage_deleteDirAndContents(const char *dirPath) {
             throwLibCError(rmdir(), err);
         }
         if (dirToDelete != dirPath) { // all but root were allocated, so they need to be freed
-            free(dirToDelete);
+            delete(dirToDelete);
         }
     }
     list_destroy(stack);

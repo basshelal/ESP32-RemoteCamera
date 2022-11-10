@@ -184,7 +184,7 @@ requestHandler(apiLog, "/api/log") {
     httpd_resp_sendstr(request, json);
 
     cJSON_Delete(linesArray);
-    free(json);
+    delete(json);
     list_destroy(list);
     return ESP_OK;
 }
@@ -258,7 +258,7 @@ requestHandler(wsLog, "/ws/log") {
         INFO("New socket fd: %i", socketNumber);
         list_addItem(this.logWebsocketData.socketsList, socketNumberPtr);
     } else {
-        free(socketNumberPtr);
+        delete(socketNumberPtr);
     }
     if (request->method == HTTP_GET) {
         return ESP_OK;
@@ -280,7 +280,7 @@ requestHandler(wsCamera, "/ws/camera") {
         INFO("New socket fd: %i", socketNumber);
         list_addItem(this.cameraWebsocketData.socketsList, socketNumberPtr);
     } else {
-        free(socketNumberPtr);
+        delete(socketNumberPtr);
     }
     if (request->method == HTTP_GET) {
         return ESP_OK;
@@ -313,7 +313,7 @@ private void clearLogDeadSocketsList(List *deadSockets, List *socketsList) {
         if (socketPtr) {
             list_removeItem(socketsList, socketPtr);
             INFO("Removed socket fd: %i", *socketPtr);
-            free(socketPtr);
+            delete(socketPtr);
         }
     }
     list_clear(deadSockets);

@@ -124,7 +124,7 @@ public SettingsError settings_getString(const SettingsKey *key,
     }
     size_t stringLength;
     if (valueIn == NULL) { // allocate to fit
-        valueIn = malloc(requiredLength * sizeof(char));
+        valueIn = alloc(requiredLength);
         stringLength = requiredLength;
     } else {
         stringLength = strlen(valueIn);

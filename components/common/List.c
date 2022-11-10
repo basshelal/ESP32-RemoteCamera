@@ -58,16 +58,16 @@ public List *list_createWithOptions(const ListOptions *listOptions) {
     this->size = 0;
     if (this->options.capacity <= 0) this->options.capacity = LIST_DEFAULT_INITIAL_CAPACITY;
     if (this->options.growthFactor <= 1) this->options.growthFactor = LIST_GROWTH_FACTOR;
-    this->items = malloc(this->options.capacity * sizeof(ListItem *));
+    this->items = alloc(this->options.capacity * sizeof(ListItem *));
     return this;
 }
 
 public void list_destroy(List *list) {
     if (!list) return;
     ListData *this = (ListData *) list;
-    free(this->items);
+    delete(this->items);
     this->items = NULL;
-    free(this);
+    delete(this);
     this = NULL;
 }
 
