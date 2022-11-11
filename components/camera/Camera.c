@@ -431,7 +431,7 @@ private void camera_taskFunction(void *arg) {
                 readDelay = esp_log_early_timestamp() - readDelay;
                 releaseMutex();
                 frameDelay = esp_log_early_timestamp() - frameDelay;
-                INFO("cap: %u ms, read: %u ms, tot: %u ms, fps: %.2f Hz",
+                INFO("cap: %u ms, read: %u ms, tot: %u ms, fps: %.2f",
                      captureDelay, readDelay, frameDelay, 1000.0F / (float) frameDelay);
             }
         }

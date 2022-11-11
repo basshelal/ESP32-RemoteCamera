@@ -33,17 +33,6 @@
   for no internet, ie, remote camera that is connected to via its own network
 * Allow (advanced) users to choose and store their desired IP address
 
-## Generic
-* Allow `List` to not shift or change shape when items are removed to allow for a concurrent 
-  read and modification list, so that you can loop over the list and remove items without problems,
-  maybe also add a function to reshape if desired, gaps in the list (removed items) will just be `NULL`s
-* Create a common `Error` type which every function returns, this enum type contains all possible errors
-  and is declared in the `Common` component, it's the best solution to having shared errors
-* Modify all functions to follow improved coding style, all functions return either an ErrorType
-  or `void` and nothing else, any returns are done through pointer parameters (stack pointers are 
-  the easy solution here) to allow for easy "exception handling" and even multiple return types
-* All modules with `init()` functions need to be made multi-call safe using a simple `bool` `isInitialized`
-
 ## Log
 * We should add an RGB LED capable of displaying multiple colors and effects to signal and detail
   errors and progress such as WiFi connecting, failed, awaiting setup etc but only for more critical

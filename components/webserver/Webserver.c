@@ -12,6 +12,11 @@
 #define FILE_BUFFER_SIZE 4096
 #define CAMERA_IMAGE_BUFFER_SIZE 4096
 
+typedef struct {
+    int fd; // socket file descriptor, used by ESP-IDF to send Web Socket Frames
+    size_t bytesSent; // keep track of this to determine if any data is missing or if starting from a continuation frame
+} CameraWebSocket;
+
 private struct {
     bool isInitialized;
     httpd_handle_t server;
@@ -22,12 +27,10 @@ private struct {
     LogList *logList;
     struct {
         List *socketsList; // list of sockets, a socket is an int
-        List *deadSockets; // sockets no longer available
         const char *logString; // string to send through log websocket
     } logWebsocketData;
     struct {
         List *socketsList; // list of sockets, a socket is an int
-        List *deadSockets; // sockets no longer available
         uint8_t *imageBuffer;
         size_t imageBufferLength;
         size_t bytesRead;
@@ -50,6 +53,17 @@ private bool socketsListIntEquals(const ListItem *a, const ListItem *b) {
         int numA = *((int *) a);
         int numb = *((int *) b);
         return numA == numb;
+    } else {
+        return false;
+    }
+}
+
+private bool cameraSocketsListEquals(const ListItem *a, const ListItem *b) {
+    if (a == NULL && b == NULL) return true;
+    else if (a != NULL && b != NULL) {
+        CameraWebSocket socketA = *((CameraWebSocket *) a);
+        CameraWebSocket socketB = *((CameraWebSocket *) b);
+        return socketA.fd == socketB.fd;
     } else {
         return false;
     }
@@ -272,15 +286,16 @@ requestHandler(wsCamera, "/ws/camera") {
     INFO("Method: %s", http_method_str(request->method));
     int socketNumber = httpd_req_to_sockfd(request);
     if (socketNumber == -1) return ESP_OK;
-    int *socketNumberPtr = new(int);
-    *socketNumberPtr = socketNumber;
-    index_t foundIndex = list_indexOfItemFunction(this.cameraWebsocketData.socketsList, socketNumberPtr,
-                                                  socketsListIntEquals);
+    CameraWebSocket *cameraWebSocket = new(CameraWebSocket);
+    cameraWebSocket->fd = socketNumber;
+    cameraWebSocket->bytesSent = 0;
+    index_t foundIndex = list_indexOfItemFunction(this.cameraWebsocketData.socketsList, cameraWebSocket,
+                                                  cameraSocketsListEquals);
     if (foundIndex == LIST_INVALID_INDEX_CAPACITY) {
         INFO("New socket fd: %i", socketNumber);
-        list_addItem(this.cameraWebsocketData.socketsList, socketNumberPtr);
+        list_addItem(this.cameraWebsocketData.socketsList, cameraWebSocket);
     } else {
-        delete(socketNumberPtr);
+        delete(cameraWebSocket);
     }
     if (request->method == HTTP_GET) {
         return ESP_OK;
@@ -307,18 +322,6 @@ requestHandler(files, "/files/*") {
     return ESP_OK;
 }
 
-private void clearLogDeadSocketsList(List *deadSockets, List *socketsList) {
-    for (int i = 0; i < list_getSize(deadSockets); i++) {
-        int *socketPtr = list_getItem(socketsList, i);
-        if (socketPtr) {
-            list_removeItem(socketsList, socketPtr);
-            INFO("Removed socket fd: %i", *socketPtr);
-            delete(socketPtr);
-        }
-    }
-    list_clear(deadSockets);
-}
-
 private void sendLogToWebSocketClients(void *arg) {
     typeof(this.logWebsocketData) *websocketDataPtr = ((typeof(this.logWebsocketData) *) arg);
     if (!websocketDataPtr) return;
@@ -335,11 +338,12 @@ private void sendLogToWebSocketClients(void *arg) {
         esp_err_t err = httpd_ws_send_frame_async(this.server, socketNumber, &websocketFrame);
         if (err) {
             if (err == ESP_ERR_INVALID_ARG) {
-                list_addItem(websocketData.deadSockets, socketPtr);
+                list_removeItemIndexed(websocketData.socketsList, i);
+                delete(socketPtr);
             }
         }
     }
-    clearLogDeadSocketsList(websocketData.deadSockets, websocketData.socketsList);
+    list_shrink(websocketData.socketsList);
 }
 
 private void logListOnAppendCallback(const LogList *_logList, const char *string) {
@@ -360,28 +364,41 @@ private void sendLiveImageToWebsocketClients(void *arg) {
     const bool isFinalFrame = bytesRemaining == 0;
     const bool isFirstFrame = bytesRead == bufferLength;
     for (int i = 0; i < list_getSize(websocketData.socketsList); i++) {
-        int *socketPtr = list_getItem(websocketData.socketsList, i);
-        if (!socketPtr) continue;
-        int socketNumber = *socketPtr;
+        CameraWebSocket *cameraWebSocket = list_getItem(websocketData.socketsList, i);
+        if (!cameraWebSocket) continue;
+        int socketNumber = cameraWebSocket->fd;
         if (httpd_ws_get_fd_info(this.server, socketNumber) != HTTPD_WS_CLIENT_WEBSOCKET) {
-            list_addItem(websocketData.deadSockets, socketPtr);
+            list_removeItemIndexed(websocketData.socketsList, i);
+            delete(cameraWebSocket);
+            INFO("Removed socket fd: %i", socketNumber);
             continue;
         }
-        httpd_ws_frame_t websocketFrame = {
-                .type =  isFirstFrame ? HTTPD_WS_TYPE_BINARY : HTTPD_WS_TYPE_CONTINUE,
-                .payload = buffer,
-                .len = bufferLength,
-                .fragmented = true,
-                .final = isFinalFrame
-        };
-        esp_err_t err = httpd_ws_send_frame_async(this.server, socketNumber, &websocketFrame);
-        if (err) {
-            if (err == ESP_ERR_INVALID_ARG) {
-                list_addItem(websocketData.deadSockets, socketPtr);
+        size_t bytesSent = cameraWebSocket->bytesSent;
+        if ((bytesSent + bufferLength) == bytesRead) {
+            httpd_ws_frame_t websocketFrame = {
+                    .type = isFirstFrame ? HTTPD_WS_TYPE_BINARY : HTTPD_WS_TYPE_CONTINUE,
+                    .payload = buffer,
+                    .len = bufferLength,
+                    .fragmented = true,
+                    .final = isFinalFrame
+            };
+            esp_err_t err = httpd_ws_send_frame_async(this.server, socketNumber, &websocketFrame);
+            if (err) {
+                if (err == ESP_ERR_INVALID_ARG) {
+                    list_removeItemIndexed(websocketData.socketsList, i);
+                    delete(cameraWebSocket);
+                    INFO("Removed socket fd: %i", socketNumber);
+                }
+            } else {
+                if (isFinalFrame) {
+                    cameraWebSocket->bytesSent = 0;
+                } else {
+                    cameraWebSocket->bytesSent += bufferLength;
+                }
             }
         }
     }
-    clearLogDeadSocketsList(websocketData.deadSockets, websocketData.socketsList);
+    list_shrink(websocketData.socketsList);
 }
 
 private void cameraLiveCaptureCallback(uint8_t *buffer, size_t bufferLength,
@@ -444,12 +461,10 @@ public Error webserver_init() {
     logList_addOnAppendCallback(this.logList, logListOnAppendCallback);
     ListOptions socketsListOptions = LIST_DEFAULT_OPTIONS;
     socketsListOptions.isGrowable = true;
+    socketsListOptions.isShrinkable = false;
     socketsListOptions.capacity = CONFIG_LWIP_MAX_SOCKETS;
     this.logWebsocketData.socketsList = list_createWithOptions(&socketsListOptions);
-    this.logWebsocketData.deadSockets = list_createWithOptions(&socketsListOptions);
-
     this.cameraWebsocketData.socketsList = list_createWithOptions(&socketsListOptions);
-    this.cameraWebsocketData.deadSockets = list_createWithOptions(&socketsListOptions);
 
     camera_setCameraLiveCaptureCallback(cameraLiveCaptureCallback);
 
