@@ -374,3 +374,33 @@ TEST("List removeItemIndexed") {
 
     list_destroy(list);
 }
+
+TEST("List not shrinkable then manual shrink") {
+    ListOptions listOptions = LIST_DEFAULT_OPTIONS;
+    listOptions.isShrinkable = false;
+
+    List *list = list_createWithOptions(&listOptions);
+
+    for (int i = 0; i < 10; i++) {
+        list_addItem(list, &myTestItems[i]);
+    }
+    ASSERT_INT_EQUAL(10, list_getSize(list), "List size was incorrect");
+
+    int indicesToRemove[4] = {0, 4, 5, 9};
+
+    for (int i = 0; i < 4; i++) {
+        int index = indicesToRemove[i];
+        list_removeItemIndexed(list, index);
+        ASSERT_INT_EQUAL(10, list_getSize(list), "List size was incorrect");
+        ASSERT_NULL(list_getItem(list, index), "Item at %i should be NULL", index);
+    }
+
+    list_shrink(list);
+
+    int myTestItemsShrunk[6] = {2, 4, 8, 64, 128, 256};
+    for (int i = 0; i < 6; i++) {
+        ASSERT_INT_EQUAL(myTestItemsShrunk[i], *((int *) list_getItem(list, i)), "Items were not equal at %i", i);
+    }
+
+    list_destroy(list);
+}

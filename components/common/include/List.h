@@ -34,6 +34,9 @@ typedef struct ListOptions {
     capacity_t capacity;
     /** true if list can grow, otherwise list will never grow when needed */
     bool isGrowable;
+    /** true if list can shrink when an item is removed, otherwise when an item is removed, NULL will be placed at
+     * that index and the size of the list will not change until list_shrink() is called */
+    bool isShrinkable;
     /** Factor to use when needing to grow, must be greater than 1 otherwise default will be used */
     capacity_t growthFactor;
     /** Function to be called when an error occurs */
@@ -45,12 +48,14 @@ typedef struct ListOptions {
 /** Initial capacity when none was given */
 #define LIST_DEFAULT_INITIAL_CAPACITY 10
 
-#define LIST_DEFAULT_OPTIONS \
-{.capacity=LIST_DEFAULT_INITIAL_CAPACITY,\
- .isGrowable=true,           \
- .growthFactor=LIST_GROWTH_FACTOR,\
- .errorCallback=NULL\
-}
+#define LIST_DEFAULT_OPTIONS               \
+{                                          \
+ .capacity = LIST_DEFAULT_INITIAL_CAPACITY,\
+ .isGrowable = true,                       \
+ .isShrinkable = true,                     \
+ .growthFactor = LIST_GROWTH_FACTOR,       \
+ .errorCallback = NULL                     \
+ }
 
 /** Create and return a list with default options from list_defaultListOptions() */
 extern List *list_create();
@@ -105,5 +110,8 @@ extern Error list_clear(const List *list);
 
 /** Equality check using == with the addresses, this is the default function used in list_indexOfItem */
 extern bool list_equalityByAddress(const ListItem *a, const ListItem *b);
+
+/** Shrink the list to remove any holes with NULL items, this is only useful if isShrinkable was set to false */
+extern Error list_shrink(const List *list);
 
 #endif //ESP32_REMOTECAMERA_LIST_H

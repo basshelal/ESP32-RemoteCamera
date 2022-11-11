@@ -177,11 +177,16 @@ public Error list_removeItemIndexed(const List *list, const index_t index) {
     if (index > lastIndex) {
         callError(this, ERROR_OUT_OF_BOUNDS);
         return ERROR_OUT_OF_BOUNDS;
-    } else if (index == lastIndex) {
-        this->size--;
+    }
+    if (this->options.isShrinkable) {
+        if (index == lastIndex) {
+            this->size--;
+        } else {
+            list_shiftLeft(this, index);
+            this->size--;
+        }
     } else {
-        list_shiftLeft(this, index);
-        this->size--;
+        this->items[index] = NULL;
     }
     return ERROR_NONE;
 }
@@ -195,4 +200,32 @@ public Error list_clear(const List *list) {
 
 public bool list_equalityByAddress(const ListItem *a, const ListItem *b) {
     return a == b;
+}
+
+public Error list_shrink(const List *list) {
+    if (!list) return ERROR_NULL_ARGUMENT;
+    ListData *this = (ListData *) list;
+    bool hasHoles = false;
+    for (int i = 0; i < this->size; i++) { // check if we even have holes since following is expensive
+        ListItem *item = this->items[i];
+        if (item == NULL) {
+            hasHoles = true;
+            break;
+        }
+    }
+    if (!hasHoles) return ERROR_NONE; // no holes, nothing to do
+
+    ListItem **shrunkenList = alloc(this->size * sizeof(ListItem *));
+    List **holedList = this->items;
+    int shrunkenListIndex = 0;
+    for (int i = 0; i < this->size; i++) {
+        ListItem *item = holedList[i];
+        if (item != NULL) { // only add if not a hole ie NULL
+            shrunkenList[shrunkenListIndex] = item;
+            shrunkenListIndex++;
+        }
+    }
+    delete(holedList);
+    this->items = shrunkenList;
+    return ERROR_NONE;
 }
