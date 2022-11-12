@@ -15,6 +15,12 @@ typedef enum CameraImageSize {
     CAMERA_IMAGE_SIZE_DEFAULT = CAMERA_IMAGE_SIZE_1280x960
 } CameraImageSize;
 
+typedef enum CameraImageQuality {
+    CAMERA_IMAGE_QUALITY_LOW = 0,
+    CAMERA_IMAGE_QUALITY_NORMAL = 1,
+    CAMERA_IMAGE_QUALITY_HIGH = 2,
+} CameraImageQuality;
+
 typedef void CameraReadCallback(char *buffer, int bufferSize, void *userArgs);
 
 typedef void CameraLiveCaptureCallback(uint8_t *buffer, size_t bufferLength,
@@ -32,6 +38,20 @@ extern Error camera_destroy();
 extern Error camera_captureImage(uint32_t *imageSize);
 
 extern Error camera_setImageSize(const CameraImageSize imageSize);
+
+extern Error camera_setSaturation(const int saturationLevel);
+
+extern Error camera_setBrightness(const int brightnessLevel);
+
+extern Error camera_setContrast(const int contrastLevel);
+
+extern Error camera_setHue(const int hueLevel);
+
+extern Error camera_setExposure(const int exposureLevel);
+
+extern Error camera_setSharpness(const int sharpnessLevel);
+
+extern Error camera_setImageQuality(const CameraImageQuality imageQuality);
 
 extern Error camera_setCameraLiveCaptureCallback(CameraLiveCaptureCallback cameraLiveCaptureCallback);
 

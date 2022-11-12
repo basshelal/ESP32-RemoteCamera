@@ -1,7 +1,14 @@
 import {JSXElement, Logger, P, useOnce} from "../../Utils"
 import {MutableRef, useRef, useState} from "preact/hooks"
 import {Slider} from "./Slider"
-import {CameraSettings, DefaultCameraSettings, ImageSize, imageSizeToString} from "../../api/Types"
+import {
+    CameraSettings,
+    DefaultCameraSettings,
+    ImageQuality,
+    imageQualityToString,
+    ImageSize,
+    imageSizeToString
+} from "../../api/Types"
 import {Api} from "../../api/Api"
 
 export interface LivePlayerProps {
@@ -55,11 +62,6 @@ export const LivePlayer = (props: P<LivePlayerProps>): JSXElement => {
     return (<div>
         <img id="livePlayerImage" ref={imageRef} style={{width: "90vw", height: "auto"}}/>
 
-        <Slider id="framerate"
-                label={`Framerate: ${cameraSettings.frameRate} Hz`}
-                min={1} max={20} value={cameraSettings.frameRate}
-                onInput={(value) => updateCameraSettings({frameRate: value})}/>
-
         <Slider id="imageSize"
                 label={`Image Size: ${imageSizeToString(cameraSettings.imageSize)}`}
                 min={ImageSize.IMAGE_SIZE_320x240} max={ImageSize.IMAGE_SIZE_2592x1944} value={cameraSettings.imageSize}
@@ -85,9 +87,14 @@ export const LivePlayer = (props: P<LivePlayerProps>): JSXElement => {
                 min={-4} max={4} value={cameraSettings.contrast}
                 onInput={(value) => updateCameraSettings({contrast: value})}/>
 
+        <Slider id="hue"
+                label={`hue: ${cameraSettings.hue}`}
+                min={-180} max={180} step={30} value={cameraSettings.hue}
+                onInput={(value) => updateCameraSettings({hue: value})}/>
+
         <Slider id="exposure"
                 label={`exposure: ${cameraSettings.exposure}`}
-                min={-4} max={4} value={cameraSettings.exposure}
+                min={-5} max={5} value={cameraSettings.exposure}
                 onInput={(value) => updateCameraSettings({exposure: value})}/>
 
         <Slider id="sharpness"
@@ -95,14 +102,9 @@ export const LivePlayer = (props: P<LivePlayerProps>): JSXElement => {
                 min={-4} max={4} value={cameraSettings.sharpness}
                 onInput={(value) => updateCameraSettings({sharpness: value})}/>
 
-        <Slider id="mirrorFlip"
-                label={`mirrorFlip: ${cameraSettings.mirrorFlip}`}
-                min={-4} max={4} value={cameraSettings.mirrorFlip}
-                onInput={(value) => updateCameraSettings({mirrorFlip: value})}/>
-
-        <Slider id="compressionQuality"
-                label={`compressionQuality: ${cameraSettings.compressionQuality}`}
-                min={-4} max={4} value={cameraSettings.compressionQuality}
-                onInput={(value) => updateCameraSettings({compressionQuality: value})}/>
+        <Slider id="imageQuality"
+                label={`imageQuality: ${imageQualityToString(cameraSettings.imageQuality)}`}
+                min={0} max={2} value={cameraSettings.imageQuality}
+                onInput={(value) => updateCameraSettings({imageQuality: value})}/>
     </div>)
 }

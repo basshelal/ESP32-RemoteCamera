@@ -46,30 +46,46 @@ export function imageSizeToString(imageSize?: ImageSize): string {
     }
 }
 
+export enum ImageQuality {
+    IMAGE_QUALITY_LOW = 0,
+    IMAGE_QUALITY_NORMAL = 1,
+    IMAGE_QUALITY_HIGH = 2,
+}
+
+export function imageQualityToString(imageQuality?: ImageQuality): string {
+    if (imageQuality == undefined) return ""
+    switch (imageQuality) {
+        case ImageQuality.IMAGE_QUALITY_LOW:
+            return "Low"
+        case ImageQuality.IMAGE_QUALITY_NORMAL:
+            return "Normal"
+        case ImageQuality.IMAGE_QUALITY_HIGH:
+            return "High"
+    }
+}
+
 export interface CameraSettings {
-    frameRate?: number
     imageSize?: ImageSize
     minutesUntilStandby?: number
     saturation?: number
     brightness?: number
     contrast?: number
+    hue?: number,
     exposure?: number
     sharpness?: number
-    mirrorFlip?: number
-    compressionQuality?: number
+    imageQuality?: ImageQuality
     isRecording?: boolean
 }
 
 export const DefaultCameraSettings: CameraSettings = {
-    frameRate: 10,
     imageSize: ImageSize.IMAGE_SIZE_1024x768,
     minutesUntilStandby: 5,
     saturation: 0,
     brightness: 0,
     contrast: 0,
+    hue: 0,
     exposure: 0,
     sharpness: 0,
-    mirrorFlip: 0,
-    compressionQuality: 0,
+    imageQuality: ImageQuality.IMAGE_QUALITY_NORMAL,
     isRecording: false
 }

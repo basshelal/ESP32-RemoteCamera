@@ -11,6 +11,7 @@
 
 #define FILE_BUFFER_SIZE 4096
 #define CAMERA_IMAGE_BUFFER_SIZE 4096
+#define CAMERA_SETTINGS_JSON_BUFFER_SIZE 1024
 
 typedef struct {
     int fd; // socket file descriptor, used by ESP-IDF to send Web Socket Frames
@@ -23,7 +24,7 @@ private struct {
     void *pageBuffer;
     void *favIconBuffer;
     char *imageBuffer;
-    char *imagePOSTBuffer;
+    char *cameraSettingsJSONBuffer;
     LogList *logList;
     struct {
         List *socketsList; // list of sockets, a socket is an int
@@ -229,9 +230,58 @@ private void cameraReadCallback(char *buffer, int bufferSize, void *userArgs) {
 requestHandler(cameraSettings, "/api/cameraSettings") {
     allowCORS(request);
 
-    httpd_req_recv(request, this.imagePOSTBuffer, CAMERA_IMAGE_BUFFER_SIZE);
+    memset(this.cameraSettingsJSONBuffer, 0, CAMERA_SETTINGS_JSON_BUFFER_SIZE);
+    httpd_req_recv(request, this.cameraSettingsJSONBuffer, CAMERA_SETTINGS_JSON_BUFFER_SIZE);
+    INFO("JSON: %s", this.cameraSettingsJSONBuffer);
 
-    INFO("%s", this.imagePOSTBuffer);
+    cJSON *json = cJSON_ParseWithOpts(this.cameraSettingsJSONBuffer, NULL, true);
+
+    cJSON *imageSize = cJSON_GetObjectItemCaseSensitive(json, "imageSize");
+    if (cJSON_IsNumber(imageSize)) {
+        camera_setImageSize(imageSize->valueint);
+    }
+
+    cJSON *minutesUntilStandby = cJSON_GetObjectItemCaseSensitive(json, "minutesUntilStandby");
+    if (cJSON_IsString(minutesUntilStandby) && minutesUntilStandby->valuestring != NULL) {
+        // TODO: 12-Nov-2022 @basshelal: Implement
+    }
+
+    cJSON *saturation = cJSON_GetObjectItemCaseSensitive(json, "saturation");
+    if (cJSON_IsNumber(saturation)) {
+        camera_setSaturation(saturation->valueint);
+    }
+
+    cJSON *brightness = cJSON_GetObjectItemCaseSensitive(json, "brightness");
+    if (cJSON_IsNumber(brightness)) {
+        camera_setBrightness(brightness->valueint);
+    }
+
+    cJSON *contrast = cJSON_GetObjectItemCaseSensitive(json, "contrast");
+    if (cJSON_IsNumber(contrast)) {
+        camera_setContrast(contrast->valueint);
+    }
+
+    cJSON *hue = cJSON_GetObjectItemCaseSensitive(json, "hue");
+    if (cJSON_IsNumber(hue)) {
+        camera_setHue(hue->valueint);
+    }
+
+    cJSON *exposure = cJSON_GetObjectItemCaseSensitive(json, "exposure");
+    if (cJSON_IsNumber(exposure)) {
+        camera_setExposure(exposure->valueint);
+    }
+
+    cJSON *sharpness = cJSON_GetObjectItemCaseSensitive(json, "sharpness");
+    if (cJSON_IsNumber(sharpness)) {
+        camera_setSharpness(sharpness->valueint);
+    }
+
+    cJSON *imageQuality = cJSON_GetObjectItemCaseSensitive(json, "imageQuality");
+    if (cJSON_IsNumber(imageQuality)) {
+        camera_setImageQuality(imageQuality->valueint);
+    }
+
+    cJSON_Delete(json);
 
     httpd_resp_set_status(request, HTTPD_200);
     finishRequest(request);
@@ -456,7 +506,7 @@ public Error webserver_init() {
     this.pageBuffer = alloc(FILE_BUFFER_SIZE);
     this.favIconBuffer = alloc(FILE_BUFFER_SIZE);
     this.imageBuffer = alloc(CAMERA_IMAGE_BUFFER_SIZE);
-    this.imagePOSTBuffer = alloc(CAMERA_IMAGE_BUFFER_SIZE);
+    this.cameraSettingsJSONBuffer = alloc(CAMERA_SETTINGS_JSON_BUFFER_SIZE);
     this.logList = log_getLogList();
     logList_addOnAppendCallback(this.logList, logListOnAppendCallback);
     ListOptions socketsListOptions = LIST_DEFAULT_OPTIONS;

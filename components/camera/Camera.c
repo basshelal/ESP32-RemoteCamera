@@ -147,11 +147,8 @@ private Error camera_getFramesToCapture(uint8_t *const framesCount) {
     return ERROR_NONE;
 }
 
-private Error camera_setHSyncPolarity();
-private Error camera_getHSyncPolarity();
-
 private Error camera_setVSyncPolarity(const bool isVsyncOn) {
-    const uint8_t data = ((uint8_t) (!isVsyncOn)) << 1;
+    const uint8_t data = ((uint8_t) (isVsyncOn)) << 1;
     spiSendOnly(0x03 | SPI_WRITE, &data, sizeof(data));
 
     return ERROR_NONE;
@@ -162,7 +159,7 @@ private Error camera_getVSyncPolarity(bool *const isVsyncOn) {
     spiReceiveOnly(0x03 | SPI_READ, &receivedData, sizeof(receivedData));
 
     const uint8_t vsyncResult = receivedData & 0x02; // vsync is bit 1
-    *isVsyncOn = !((bool) vsyncResult);
+    *isVsyncOn = (bool) vsyncResult;
     return ERROR_NONE;
 }
 
@@ -190,8 +187,6 @@ private Error camera_resetFIFORead() {
     spiSendOnly(0x04 | SPI_WRITE, &data, sizeof(data));
     return ERROR_NONE;
 }
-
-// TODO: 25-Oct-2022 @basshelal: Sensor standby and sensor low power
 
 private Error camera_burstFIFORead(uint8_t *const byteBuffer, const int bufferLength) {
     spi_transaction_t tx = {
@@ -228,8 +223,6 @@ private Error camera_getVersion(uint8_t *const major, uint8_t *const minor) {
 
     return ERROR_NONE;
 }
-
-private Error camera_getVSyncPinStatus();
 
 private Error camera_getFIFOWriteDoneFlag(bool *const isFIFODone) {
     uint8_t receivedData = 0;
@@ -287,6 +280,459 @@ public Error camera_setImageSize(const CameraImageSize imageSize) {
             break;
         case CAMERA_IMAGE_SIZE_2592x1944:
             i2cWriteRegistryEntries(OV5642_2592x1944);
+            break;
+        default:
+            break;
+    }
+    releaseMutex();
+    return ERROR_NONE;
+}
+
+public Error camera_setSaturation(const int saturationLevel) {
+    obtainMutex();
+    switch (saturationLevel) {
+        case 4:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5583, 0x80);
+            i2cWriteByte(0x5584, 0x80);
+            i2cWriteByte(0x5580, 0x02);
+            break;
+        case 3:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5583, 0x70);
+            i2cWriteByte(0x5584, 0x70);
+            i2cWriteByte(0x5580, 0x02);
+            break;
+        case 2:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5583, 0x60);
+            i2cWriteByte(0x5584, 0x60);
+            i2cWriteByte(0x5580, 0x02);
+            break;
+        case 1:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5583, 0x50);
+            i2cWriteByte(0x5584, 0x50);
+            i2cWriteByte(0x5580, 0x02);
+            break;
+        case 0:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5583, 0x40);
+            i2cWriteByte(0x5584, 0x40);
+            i2cWriteByte(0x5580, 0x02);
+            break;
+        case -1:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5583, 0x30);
+            i2cWriteByte(0x5584, 0x30);
+            i2cWriteByte(0x5580, 0x02);
+            break;
+        case -2:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5583, 0x20);
+            i2cWriteByte(0x5584, 0x20);
+            i2cWriteByte(0x5580, 0x02);
+            break;
+        case -3:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5583, 0x10);
+            i2cWriteByte(0x5584, 0x10);
+            i2cWriteByte(0x5580, 0x02);
+            break;
+        case -4:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5583, 0x00);
+            i2cWriteByte(0x5584, 0x00);
+            i2cWriteByte(0x5580, 0x02);
+            break;
+        default:
+            break;
+    }
+    releaseMutex();
+    return ERROR_NONE;
+}
+
+public Error camera_setBrightness(const int brightnessLevel) {
+    obtainMutex();
+    switch (brightnessLevel) {
+        case 4:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5589, 0x40);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case 3:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5589, 0x30);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case 2:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5589, 0x20);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case 1:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5589, 0x10);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case 0:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5589, 0x00);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case -1:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5589, 0x10);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x558a, 0x08);
+            break;
+        case -2:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5589, 0x20);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x558a, 0x08);
+            break;
+        case -3:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5589, 0x30);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x558a, 0x08);
+            break;
+        case -4:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5589, 0x40);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x558a, 0x08);
+            break;
+        default:
+            break;
+    }
+    releaseMutex();
+    return ERROR_NONE;
+}
+
+public Error camera_setContrast(const int contrastLevel) {
+    obtainMutex();
+    switch (contrastLevel) {
+        case 4:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x5587, 0x30);
+            i2cWriteByte(0x5588, 0x30);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case 3:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x5587, 0x2c);
+            i2cWriteByte(0x5588, 0x2c);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case 2:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x5587, 0x28);
+            i2cWriteByte(0x5588, 0x28);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case 1:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x5587, 0x24);
+            i2cWriteByte(0x5588, 0x24);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case 0:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x5587, 0x20);
+            i2cWriteByte(0x5588, 0x20);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case -1:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x5587, 0x1c);
+            i2cWriteByte(0x5588, 0x1c);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case -2:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x5587, 0x18);
+            i2cWriteByte(0x5588, 0x18);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case -3:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x5587, 0x14);
+            i2cWriteByte(0x5588, 0x14);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        case -4:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x04);
+            i2cWriteByte(0x5587, 0x10);
+            i2cWriteByte(0x5588, 0x10);
+            i2cWriteByte(0x558a, 0x00);
+            break;
+        default:
+            break;
+    }
+    releaseMutex();
+    return ERROR_NONE;
+}
+
+public Error camera_setHue(const int hueLevel) {
+    obtainMutex();
+    switch (hueLevel) {
+        case -180:
+        case 180:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x80);
+            i2cWriteByte(0x5582, 0x00);
+            i2cWriteByte(0x558a, 0x32);
+            break;
+        case -150:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x6f);
+            i2cWriteByte(0x5582, 0x40);
+            i2cWriteByte(0x558a, 0x32);
+            break;
+        case -120:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x40);
+            i2cWriteByte(0x5582, 0x6f);
+            i2cWriteByte(0x558a, 0x32);
+            break;
+        case -90:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x00);
+            i2cWriteByte(0x5582, 0x80);
+            i2cWriteByte(0x558a, 0x02);
+            break;
+        case -60:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x40);
+            i2cWriteByte(0x5582, 0x6f);
+            i2cWriteByte(0x558a, 0x02);
+            break;
+        case -30:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x6f);
+            i2cWriteByte(0x5582, 0x40);
+            i2cWriteByte(0x558a, 0x02);
+            break;
+        case 0:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x80);
+            i2cWriteByte(0x5582, 0x00);
+            i2cWriteByte(0x558a, 0x01);
+            break;
+        case 30:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x6f);
+            i2cWriteByte(0x5582, 0x40);
+            i2cWriteByte(0x558a, 0x01);
+            break;
+        case 60:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x40);
+            i2cWriteByte(0x5582, 0x6f);
+            i2cWriteByte(0x558a, 0x01);
+            break;
+        case 90:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x00);
+            i2cWriteByte(0x5582, 0x80);
+            i2cWriteByte(0x558a, 0x31);
+            break;
+        case 120:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x40);
+            i2cWriteByte(0x5582, 0x6f);
+            i2cWriteByte(0x558a, 0x31);
+            break;
+        case 150:
+            i2cWriteByte(0x5001, 0xff);
+            i2cWriteByte(0x5580, 0x01);
+            i2cWriteByte(0x5581, 0x6f);
+            i2cWriteByte(0x5582, 0x40);
+            i2cWriteByte(0x558a, 0x31);
+            break;
+        default:
+            break;
+    }
+    releaseMutex();
+    return ERROR_NONE;
+}
+
+public Error camera_setExposure(const int exposureLevel) {
+    obtainMutex();
+    switch (exposureLevel) {
+        case -5:
+            i2cWriteByte(0x3a0f, 0x10);
+            i2cWriteByte(0x3a10, 0x08);
+            i2cWriteByte(0x3a1b, 0x10);
+            i2cWriteByte(0x3a1e, 0x08);
+            i2cWriteByte(0x3a11, 0x20);
+            i2cWriteByte(0x3a1f, 0x10);
+            break;
+        case -4:
+            i2cWriteByte(0x3a0f, 0x18);
+            i2cWriteByte(0x3a10, 0x10);
+            i2cWriteByte(0x3a1b, 0x18);
+            i2cWriteByte(0x3a1e, 0x10);
+            i2cWriteByte(0x3a11, 0x30);
+            i2cWriteByte(0x3a1f, 0x10);
+            break;
+        case -3:
+            i2cWriteByte(0x3a0f, 0x20);
+            i2cWriteByte(0x3a10, 0x18);
+            i2cWriteByte(0x3a11, 0x41);
+            i2cWriteByte(0x3a1b, 0x20);
+            i2cWriteByte(0x3a1e, 0x18);
+            i2cWriteByte(0x3a1f, 0x10);
+            break;
+        case -2:
+            i2cWriteByte(0x3a0f, 0x28);
+            i2cWriteByte(0x3a10, 0x20);
+            i2cWriteByte(0x3a11, 0x51);
+            i2cWriteByte(0x3a1b, 0x28);
+            i2cWriteByte(0x3a1e, 0x20);
+            i2cWriteByte(0x3a1f, 0x10);
+            break;
+        case -1:
+            i2cWriteByte(0x3a0f, 0x30);
+            i2cWriteByte(0x3a10, 0x28);
+            i2cWriteByte(0x3a11, 0x61);
+            i2cWriteByte(0x3a1b, 0x30);
+            i2cWriteByte(0x3a1e, 0x28);
+            i2cWriteByte(0x3a1f, 0x10);
+            break;
+        case 0:
+            i2cWriteByte(0x3a0f, 0x38);
+            i2cWriteByte(0x3a10, 0x30);
+            i2cWriteByte(0x3a11, 0x61);
+            i2cWriteByte(0x3a1b, 0x38);
+            i2cWriteByte(0x3a1e, 0x30);
+            i2cWriteByte(0x3a1f, 0x10);
+            break;
+        case 1:
+            i2cWriteByte(0x3a0f, 0x40);
+            i2cWriteByte(0x3a10, 0x38);
+            i2cWriteByte(0x3a11, 0x71);
+            i2cWriteByte(0x3a1b, 0x40);
+            i2cWriteByte(0x3a1e, 0x38);
+            i2cWriteByte(0x3a1f, 0x10);
+            break;
+        case 2:
+            i2cWriteByte(0x3a0f, 0x48);
+            i2cWriteByte(0x3a10, 0x40);
+            i2cWriteByte(0x3a11, 0x80);
+            i2cWriteByte(0x3a1b, 0x48);
+            i2cWriteByte(0x3a1e, 0x40);
+            i2cWriteByte(0x3a1f, 0x20);
+            break;
+        case 3:
+            i2cWriteByte(0x3a0f, 0x50);
+            i2cWriteByte(0x3a10, 0x48);
+            i2cWriteByte(0x3a11, 0x90);
+            i2cWriteByte(0x3a1b, 0x50);
+            i2cWriteByte(0x3a1e, 0x48);
+            i2cWriteByte(0x3a1f, 0x20);
+            break;
+        case 4:
+            i2cWriteByte(0x3a0f, 0x58);
+            i2cWriteByte(0x3a10, 0x50);
+            i2cWriteByte(0x3a11, 0x91);
+            i2cWriteByte(0x3a1b, 0x58);
+            i2cWriteByte(0x3a1e, 0x50);
+            i2cWriteByte(0x3a1f, 0x20);
+            break;
+        case 5:
+            i2cWriteByte(0x3a0f, 0x60);
+            i2cWriteByte(0x3a10, 0x58);
+            i2cWriteByte(0x3a11, 0xa0);
+            i2cWriteByte(0x3a1b, 0x60);
+            i2cWriteByte(0x3a1e, 0x58);
+            i2cWriteByte(0x3a1f, 0x20);
+            break;
+        default:
+            break;
+    }
+    releaseMutex();
+    return ERROR_NONE;
+}
+
+public Error camera_setSharpness(const int sharpnessLevel) {
+    obtainMutex();
+    // TODO: 12-Nov-2022 @basshelal: Implement!
+    switch (sharpnessLevel) {
+        case 4:
+
+            break;
+        case 3:
+
+            break;
+        case 2:
+
+            break;
+        case 1:
+
+            break;
+        case 0:
+
+            break;
+        case -1:
+
+            break;
+        case -2:
+
+            break;
+        case -3:
+
+            break;
+        case -4:
+
+            break;
+        default:
+            break;
+    }
+    releaseMutex();
+    return ERROR_NONE;
+}
+
+public Error camera_setImageQuality(const CameraImageQuality imageQuality) {
+    obtainMutex();
+    switch (imageQuality) {
+        case CAMERA_IMAGE_QUALITY_NORMAL:
+            i2cWriteByte(0x4407, 0x04); // average, default
+            break;
+        case CAMERA_IMAGE_QUALITY_LOW:
+            i2cWriteByte(0x4407, 0x08); // high compression, low quality image
+            break;
+        case CAMERA_IMAGE_QUALITY_HIGH:
+            i2cWriteByte(0x4407, 0x02); // low compression, high quality image
+            break;
+        default:
             break;
     }
     releaseMutex();
@@ -376,26 +822,6 @@ private void camera_showOV5642TestColorBar() {
     i2cWriteByte(0x503e, 0x00);
 }
 
-enum CompressionAmount {
-    COMPRESSION_DEFAULT, COMPRESSION_HIGH, COMPRESSION_LOW,
-};
-
-private void camera_setCompressionAmount(const enum CompressionAmount compressionAmount) {
-    obtainMutex();
-    switch (compressionAmount) {
-        case COMPRESSION_DEFAULT:
-            i2cWriteByte(0x4407, 0x04); // average, default
-            break;
-        case COMPRESSION_HIGH:
-            i2cWriteByte(0x4407, 0x08); // high compression, low quality image
-            break;
-        case COMPRESSION_LOW:
-            i2cWriteByte(0x4407, 0x02); // low compression, high quality image
-            break;
-    }
-    releaseMutex();
-}
-
 private void camera_taskFunction(void *arg) {
     typeof(this) *thisPtr = (typeof(this) *) arg;
     uint32_t stackMinBytes = 0;
@@ -475,10 +901,9 @@ public Error camera_start() {
     i2cWriteByte(0x5184, 0x20);
     i2cWriteByte(0x5182, 0x11);
     i2cWriteByte(0x5183, 0x00);
-    camera_setCompressionAmount(COMPRESSION_HIGH);
-    camera_setImageSize(CAMERA_IMAGE_SIZE_640x480);
+    camera_setImageSize(CAMERA_IMAGE_SIZE_DEFAULT);
 
-    camera_setVSyncPolarity(false);
+    camera_setVSyncPolarity(true);
     camera_setFramesToCapture(1);
     camera_resetFIFOWrite();
     camera_resetFIFORead();

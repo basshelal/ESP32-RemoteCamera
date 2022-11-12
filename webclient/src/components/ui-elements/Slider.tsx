@@ -15,7 +15,7 @@ export const Slider = (props: P<SliderProps>) => {
 
     const onInput = (event: Event) => {
         const value = (event.target as HTMLInputElement).valueAsNumber
-        if (props.onInput && value) {
+        if (props.onInput) {
             props.onInput(value)
         }
     }
